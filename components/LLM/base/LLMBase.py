@@ -7,9 +7,10 @@ implement the abstract methods to provide specific LLM functionalities.
 """
 
 from abc import ABC
+import logging
 from typing import Optional, List
 from pydantic import BaseModel, Field
-import logging
+from pydantic import model_validator
 
 
 class LLMConfigBase(BaseModel):
@@ -79,7 +80,6 @@ class LLMBase(BaseModel, ABC):
         else:
             print(f"[{logging.getLevelName(level)}] {message}")
 
-    @classmethod
     def get_models(cls) -> List[str]:
         """
         Return a list of all available models for this LLM.
@@ -89,16 +89,15 @@ class LLMBase(BaseModel, ABC):
         """
         return cls._models
 
-    # Ensure model is always in models
-    @classmethod
-    def __get_validators__(cls):
-        yield from super().__get_validators__()
-        yield cls.validate_model_in_models
-
-    @classmethod
-    def validate_model_in_models(cls, value):
-        if value.model not in cls._models:
+    @model_validator(mode="after")
+    def validate_model_in_models(self):
+        if self.model not in self._models:
             raise ValueError(
-                f"Model '{value.model}' is not in the list of available models: {cls._models}"
+                f"Model '{self.model}' is not in the list of available models: {self._models}"
             )
-        return value
+        return self
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement the '__call__' method."
+        )
