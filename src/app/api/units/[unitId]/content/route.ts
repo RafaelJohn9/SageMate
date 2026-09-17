@@ -58,8 +58,24 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Only PDF and DOCX files are supported" }, { status: 400 });
     }
 
+    const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: `"${file.name}" is too large (${Math.round(file.size / 1024 / 1024)}MB). Max size is 20MB.` },
+        { status: 413 },
+      );
+    }
+
     const buffer = await file.arrayBuffer();
-    const rawText = isPdf ? await extractPdfText(buffer) : await extractDocxText(buffer);
+    let rawText: string;
+    try {
+      rawText = isPdf ? await extractPdfText(buffer) : await extractDocxText(buffer);
+    } catch (err) {
+      return NextResponse.json(
+        { error: `Could not read "${file.name}": ${err instanceof Error ? err.message : String(err)}` },
+        { status: 422 },
+      );
+    }
 
     if (!rawText) {
       return NextResponse.json({ error: "Could not extract any text from the file" }, { status: 422 });

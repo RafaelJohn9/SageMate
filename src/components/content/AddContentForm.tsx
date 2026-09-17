@@ -46,7 +46,25 @@ export function AddContentForm({ unitId }: { unitId: string }) {
     formData.set("contentKind", contentKind);
     formData.set("purpose", resolvedPurpose);
     formData.set("file", pending.file);
-    const res = await fetch(`/api/units/${unitId}/content`, { method: "POST", body: formData });
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 40_000);
+    let res: Response;
+    try {
+      res = await fetch(`/api/units/${unitId}/content`, {
+        method: "POST",
+        body: formData,
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return `Timed out uploading "${pending.file.name}" — the file may be too large or complex.`;
+      }
+      return `Network error uploading "${pending.file.name}".`;
+    } finally {
+      clearTimeout(timer);
+    }
+
     if (res.ok) return null;
     const body = await res.json().catch(() => null);
     return typeof body?.error === "string" ? body.error : `Failed to upload "${pending.file.name}"`;
