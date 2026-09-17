@@ -1,0 +1,120 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Unit {
+  id           String        @id @default(cuid())
+  name         String
+  description  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  content      Content[]
+  questionSets QuestionSet[]
+}
+
+enum SourceType {
+  PASTE
+  PDF
+  DOCX
+}
+
+enum ContentKind {
+  NOTES
+  PAST_PAPER
+}
+
+model Content {
+  id               String               @id @default(cuid())
+  unitId           String
+  unit             Unit                 @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  title            String
+  sourceType       SourceType
+  contentKind      ContentKind          @default(NOTES)
+  purpose          String               @default("GENERAL")
+  rawText          String
+  originalFilename String?
+  createdAt        DateTime             @default(now())
+  questionSets     QuestionSetContent[]
+}
+
+enum QuestionSetStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model QuestionSet {
+  id            String               @id @default(cuid())
+  unitId        String
+  unit          Unit                 @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  name          String
+  purposeFilter String
+  status        QuestionSetStatus    @default(PENDING)
+  provider      String
+  model         String
+  createdAt     DateTime             @default(now())
+  sourceContent QuestionSetContent[]
+  questions     Question[]
+}
+
+model QuestionSetContent {
+  questionSetId String
+  contentId     String
+  questionSet   QuestionSet @relation(fields: [questionSetId], references: [id], onDelete: Cascade)
+  content       Content     @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@id([questionSetId, contentId])
+}
+
+enum QuestionType {
+  CONCEPTUAL
+  APPLICATION
+}
+
+model Question {
+  id            String       @id @default(cuid())
+  questionSetId String
+  questionSet   QuestionSet  @relation(fields: [questionSetId], references: [id], onDelete: Cascade)
+  text          String
+  orderIndex    Int
+  questionType  QuestionType @default(CONCEPTUAL)
+  createdAt     DateTime     @default(now())
+  attempts      Attempt[]
+}
+
+enum AttemptMode {
+  IMMEDIATE
+  BATCH
+}
+
+model Attempt {
+  id          String      @id @default(cuid())
+  questionId  String
+  question    Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answerText  String
+  mode        AttemptMode
+  submittedAt DateTime    @default(now())
+  grading     Grading?
+}
+
+model Grading {
+  id          String   @id @default(cuid())
+  attemptId   String   @unique
+  attempt     Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  score       Int
+  feedback    String
+  modelAnswer String?
+  provider    String
+  model       String
+  gradedAt    DateTime @default(now())
+}
