@@ -73,3 +73,77 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
+
+.md-content > :first-child {
+  margin-top: 0;
+}
+.md-content > :last-child {
+  margin-bottom: 0;
+}
+.md-content p {
+  margin: 0.5em 0;
+  line-height: 1.5;
+}
+.md-content ul,
+.md-content ol {
+  margin: 0.5em 0;
+  padding-left: 1.4em;
+}
+.md-content ul {
+  list-style: disc;
+}
+.md-content ol {
+  list-style: decimal;
+}
+.md-content li {
+  margin: 0.2em 0;
+}
+.md-content li > p {
+  margin: 0;
+}
+.md-content strong {
+  font-weight: 600;
+}
+.md-content code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.9em;
+  background: var(--border);
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+}
+.md-content pre {
+  background: var(--border);
+  border-radius: 6px;
+  padding: 0.6em 0.8em;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.md-content pre code {
+  background: none;
+  padding: 0;
+}
+.md-content blockquote {
+  border-left: 2px solid var(--border);
+  padding-left: 0.8em;
+  margin: 0.5em 0;
+  color: var(--muted-foreground);
+}
+.md-content h1,
+.md-content h2,
+.md-content h3 {
+  font-weight: 600;
+  margin: 0.6em 0 0.3em;
+}
+.md-content h1 {
+  font-size: 1.15em;
+}
+.md-content h2 {
+  font-size: 1.08em;
+}
+.md-content h3 {
+  font-size: 1em;
+}
+.md-content a {
+  color: var(--primary);
+  text-decoration: underline;
+}

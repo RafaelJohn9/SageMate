@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Markdown } from "@/components/ui/Markdown";
 
 type GradingResult = {
   score: number;
@@ -233,12 +234,14 @@ export function AnsweringPanel({ questions, setId }: { questions: QuestionData[]
               {result && (
                 <div className="mt-3 rounded-md border border-success/30 bg-success-tint p-3 text-sm">
                   <p className="font-medium text-success">Score: {formatScore(result, q.marks)}</p>
-                  <p className="mt-1 text-foreground">{result.feedback}</p>
+                  <div className="mt-1 text-foreground">
+                    <Markdown>{result.feedback}</Markdown>
+                  </div>
                   {result.modelAnswer && (
-                    <p className="mt-2 text-muted-foreground">
-                      <span className="font-medium">Model answer: </span>
-                      {result.modelAnswer}
-                    </p>
+                    <div className="mt-2 text-muted-foreground">
+                      <span className="font-medium text-foreground">Model answer: </span>
+                      <Markdown>{result.modelAnswer}</Markdown>
+                    </div>
                   )}
                   {q.markingScheme && (
                     <p className="mt-2 text-muted-foreground">
