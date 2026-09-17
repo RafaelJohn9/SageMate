@@ -54,20 +54,22 @@ export class GroqProvider implements LLMProvider {
     user: string,
     schema: z.ZodType<T>,
   ): Promise<T> {
+    const ATTEMPTS = 3;
     let lastError: unknown;
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const completion = await this.client.chat.completions.create({
-        model: this.model,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        response_format: { type: "json_object" },
-        temperature: attempt === 0 ? 0.7 : 0.2,
-      });
-
-      const raw = completion.choices[0]?.message?.content ?? "";
+    for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
       try {
+        const completion = await this.client.chat.completions.create({
+          model: this.model,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+          response_format: { type: "json_object" },
+          temperature: attempt === 0 ? 0.7 : 0.2,
+          max_completion_tokens: 8192,
+        });
+
+        const raw = completion.choices[0]?.message?.content ?? "";
         const parsed = JSON.parse(raw);
         return schema.parse(parsed);
       } catch (err) {
