@@ -9,8 +9,8 @@ export async function Sidebar() {
   });
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col gap-4 border-r border-zinc-200 px-3 py-6 dark:border-zinc-800">
-      <Link href="/" className="px-2 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+    <aside className="flex w-56 shrink-0 flex-col gap-4 border-r border-border px-3 py-6">
+      <Link href="/" className="px-2 font-serif text-xl font-semibold text-foreground">
         SageMate
       </Link>
       <SidebarNav units={units} />

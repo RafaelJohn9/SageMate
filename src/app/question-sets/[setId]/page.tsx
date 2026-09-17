@@ -46,30 +46,30 @@ export default async function QuestionSetDetailPage({
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-12">
       <header className="flex flex-col gap-1">
-        <Link href={`/units/${questionSet.unitId}`} className="text-sm text-zinc-500 hover:underline">
+        <Link href={`/units/${questionSet.unitId}`} className="text-sm text-muted-foreground hover:underline">
           ← {questionSet.unit.name}
         </Link>
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{questionSet.name}</h1>
-        <p className="text-xs text-zinc-400">
+        <h1 className="font-serif text-2xl font-semibold text-foreground">{questionSet.name}</h1>
+        <p className="text-xs text-muted-foreground">
           Generated {formatRelativeTime(questionSet.createdAt)} · {questionSet.status.toLowerCase()} · purpose:{" "}
           {questionSet.purposeFilter} · {questionSet.provider}/{questionSet.model}
         </p>
         <div className="mt-2 flex flex-wrap gap-3 text-xs">
           <a
             href={`/api/question-sets/${questionSet.id}/export`}
-            className="text-zinc-500 hover:underline"
+            className="text-primary hover:underline"
           >
             Export: questions only (PDF)
           </a>
           <a
             href={`/api/question-sets/${questionSet.id}/export?withAnswers=true`}
-            className="text-zinc-500 hover:underline"
+            className="text-primary hover:underline"
           >
             Export: questions + your answers (PDF)
           </a>
           <a
             href={`/api/question-sets/${questionSet.id}/export?withAnswers=true&withCorrections=true`}
-            className="text-zinc-500 hover:underline"
+            className="text-primary hover:underline"
           >
             Export: questions + answers + corrections (PDF)
           </a>

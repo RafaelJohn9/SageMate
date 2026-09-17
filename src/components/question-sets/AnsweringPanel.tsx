@@ -154,14 +154,14 @@ export function AnsweringPanel({ questions, setId }: { questions: QuestionData[]
         <button
           type="button"
           onClick={() => setMode("immediate")}
-          className={`rounded-md px-3 py-1.5 ${mode === "immediate" ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900" : "border border-zinc-300 dark:border-zinc-700"}`}
+          className={`rounded-md px-3 py-1.5 ${mode === "immediate" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
         >
           Answer & grade one at a time
         </button>
         <button
           type="button"
           onClick={() => setMode("batch")}
-          className={`rounded-md px-3 py-1.5 ${mode === "batch" ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900" : "border border-zinc-300 dark:border-zinc-700"}`}
+          className={`rounded-md px-3 py-1.5 ${mode === "batch" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
         >
           Answer all, then grade
         </button>
@@ -173,14 +173,14 @@ export function AnsweringPanel({ questions, setId }: { questions: QuestionData[]
           const gradingError = gradingErrors[q.id];
           const questionHistory = history[q.id];
           return (
-            <li key={q.id} className="rounded-lg border border-zinc-200 p-4 text-sm dark:border-zinc-800">
+            <li key={q.id} className="rounded-lg border border-border bg-card p-4 text-sm">
               <div className="mb-2 flex items-center gap-2">
-                <span className="font-medium text-zinc-500">Q{q.orderIndex + 1}</span>
+                <span className="font-medium text-muted-foreground">Q{q.orderIndex + 1}</span>
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs ${
                     q.questionType === "APPLICATION"
-                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                      : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                      ? "bg-mark-tint text-mark"
+                      : "bg-border/50 text-muted-foreground"
                   }`}
                 >
                   {q.questionType === "APPLICATION" ? "Application" : "Conceptual"}
@@ -188,7 +188,7 @@ export function AnsweringPanel({ questions, setId }: { questions: QuestionData[]
                 <button
                   type="button"
                   onClick={() => toggleHistory(q.id)}
-                  className="ml-auto text-xs text-zinc-400 hover:underline"
+                  className="ml-auto text-xs text-muted-foreground hover:underline"
                 >
                   {historyOpenId === q.id ? "Hide history" : "History"}
                 </button>
@@ -199,7 +199,7 @@ export function AnsweringPanel({ questions, setId }: { questions: QuestionData[]
                 onChange={(e) => setAnswer(q.id, e.target.value)}
                 placeholder="Write your answer…"
                 rows={4}
-                className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
               />
               {mode === "immediate" && (
                 <div className="mt-2 flex items-center gap-3">
@@ -207,39 +207,39 @@ export function AnsweringPanel({ questions, setId }: { questions: QuestionData[]
                     type="button"
                     onClick={() => submitImmediate(q.id)}
                     disabled={submittingId === q.id}
-                    className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+                    className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
                   >
                     {submittingId === q.id ? "Grading…" : result ? "Submit again (retry)" : "Submit answer"}
                   </button>
                 </div>
               )}
               {result && (
-                <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm dark:border-emerald-900 dark:bg-emerald-950/40">
-                  <p className="font-medium text-emerald-800 dark:text-emerald-300">Score: {result.score}/100</p>
-                  <p className="mt-1 text-zinc-700 dark:text-zinc-300">{result.feedback}</p>
+                <div className="mt-3 rounded-md border border-success/30 bg-success-tint p-3 text-sm">
+                  <p className="font-medium text-success">Score: {result.score}/100</p>
+                  <p className="mt-1 text-foreground">{result.feedback}</p>
                   {result.modelAnswer && (
-                    <p className="mt-2 text-zinc-500">
+                    <p className="mt-2 text-muted-foreground">
                       <span className="font-medium">Model answer: </span>
                       {result.modelAnswer}
                     </p>
                   )}
                 </div>
               )}
-              {gradingError && <p className="mt-2 text-xs text-red-600">{gradingError}</p>}
+              {gradingError && <p className="mt-2 text-xs text-danger">{gradingError}</p>}
 
               {historyOpenId === q.id && (
-                <div className="mt-3 flex flex-col gap-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">
-                  {historyLoading && !questionHistory && <p className="text-xs text-zinc-400">Loading…</p>}
+                <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+                  {historyLoading && !questionHistory && <p className="text-xs text-muted-foreground">Loading…</p>}
                   {questionHistory?.length === 0 && (
-                    <p className="text-xs text-zinc-400">No previous attempts.</p>
+                    <p className="text-xs text-muted-foreground">No previous attempts.</p>
                   )}
                   {questionHistory?.map((attempt) => (
-                    <div key={attempt.id} className="rounded-md bg-zinc-50 p-2 text-xs dark:bg-zinc-900">
-                      <p className="text-zinc-400">
+                    <div key={attempt.id} className="rounded-md bg-background p-2 text-xs">
+                      <p className="text-muted-foreground">
                         {new Date(attempt.submittedAt).toLocaleString()} · {attempt.mode.toLowerCase()}
                         {attempt.grading ? ` · ${attempt.grading.score}/100` : ""}
                       </p>
-                      <p className="mt-1 text-zinc-600 dark:text-zinc-400">{attempt.answerText}</p>
+                      <p className="mt-1 text-muted-foreground">{attempt.answerText}</p>
                     </div>
                   ))}
                 </div>
@@ -249,19 +249,19 @@ export function AnsweringPanel({ questions, setId }: { questions: QuestionData[]
         })}
       </ol>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       {mode === "batch" && (
         <button
           type="button"
           onClick={submitBatch}
           disabled={batchSubmitting}
-          className="self-start rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >
           {batchSubmitting ? "Grading…" : "Submit all answers"}
         </button>
       )}
-      {batchDone && <p className="text-sm text-emerald-600">All answers graded above.</p>}
+      {batchDone && <p className="text-sm text-success">All answers graded above.</p>}
     </div>
   );
 }

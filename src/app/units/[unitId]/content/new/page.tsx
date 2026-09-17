@@ -17,10 +17,10 @@ export default async function NewContentPage({
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-12">
       <header className="flex flex-col gap-1">
-        <Link href={`/units/${unitId}`} className="text-sm text-zinc-500 hover:underline">
+        <Link href={`/units/${unitId}`} className="text-sm text-muted-foreground hover:underline">
           ← {unit.name}
         </Link>
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Add content</h1>
+        <h1 className="font-serif text-2xl font-semibold text-foreground">Add content</h1>
       </header>
       <AddContentForm unitId={unitId} />
     </div>

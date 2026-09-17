@@ -31,36 +31,36 @@ export default async function UnitDetailPage({
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-12">
       <header className="flex flex-col gap-1">
-        <Link href="/" className="text-sm text-zinc-500 hover:underline">
+        <Link href="/" className="text-sm text-muted-foreground hover:underline">
           ← All units
         </Link>
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{unit.name}</h1>
-        {unit.description && <p className="text-sm text-zinc-600 dark:text-zinc-400">{unit.description}</p>}
+        <h1 className="font-serif text-2xl font-semibold text-foreground">{unit.name}</h1>
+        {unit.description && <p className="text-sm text-muted-foreground">{unit.description}</p>}
         <RenameUnitForm unitId={unit.id} initialName={unit.name} initialDescription={unit.description} />
       </header>
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Content</h2>
-          <Link href={`/units/${unit.id}/content/new`} className="text-sm text-zinc-500 hover:underline">
+          <h2 className="text-sm font-semibold text-foreground">Content</h2>
+          <Link href={`/units/${unit.id}/content/new`} className="text-sm text-muted-foreground hover:underline">
             + Add content
           </Link>
         </div>
         {unit.content.length === 0 ? (
-          <p className="text-sm text-zinc-500">No content added yet.</p>
+          <p className="text-sm text-muted-foreground">No content added yet.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {unit.content.map((c) => (
               <li
                 key={c.id}
-                className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800"
+                className="flex items-center justify-between rounded-lg border border-border bg-card p-3 text-sm"
               >
                 <div>
                   <span className="font-medium">{c.title}</span>{" "}
-                  <span className="text-zinc-400">
+                  <span className="text-muted-foreground">
                     ({c.contentKind === "PAST_PAPER" ? "past paper" : "notes"} · {c.purpose})
                   </span>
-                  <p className="text-xs text-zinc-400">Added {formatRelativeTime(c.createdAt)}</p>
+                  <p className="text-xs text-muted-foreground">Added {formatRelativeTime(c.createdAt)}</p>
                 </div>
                 <DeleteContentButton contentId={c.id} />
               </li>
@@ -71,25 +71,25 @@ export default async function UnitDetailPage({
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Question sets</h2>
-          <Link href={`/units/${unit.id}/question-sets/new`} className="text-sm text-zinc-500 hover:underline">
+          <h2 className="text-sm font-semibold text-foreground">Question sets</h2>
+          <Link href={`/units/${unit.id}/question-sets/new`} className="text-sm text-muted-foreground hover:underline">
             + Generate questions
           </Link>
         </div>
         {unit.questionSets.length === 0 ? (
-          <p className="text-sm text-zinc-500">No question sets generated yet.</p>
+          <p className="text-sm text-muted-foreground">No question sets generated yet.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {unit.questionSets.map((qs) => {
               const total = qs.questions.length;
               const answered = qs.questions.filter((q) => q._count.attempts > 0).length;
               return (
-                <li key={qs.id} className="rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
+                <li key={qs.id} className="rounded-lg border border-border bg-card p-3 text-sm">
                   <Link href={`/question-sets/${qs.id}`} className="font-medium hover:underline">
                     {qs.name}
                   </Link>{" "}
-                  <span className="text-zinc-400">({qs.status.toLowerCase()})</span>
-                  <p className="text-xs text-zinc-400">
+                  <span className="text-muted-foreground">({qs.status.toLowerCase()})</span>
+                  <p className="text-xs text-muted-foreground">
                     Generated {formatRelativeTime(qs.createdAt)} · {answered}/{total} answered · purpose:{" "}
                     {qs.purposeFilter}
                   </p>

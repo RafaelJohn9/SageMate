@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type DragEvent, type FormEvent } from "react";
 
 const PURPOSE_PRESETS = ["GENERAL", "CAT1", "CAT2", "EXAM"];
 
@@ -13,6 +13,7 @@ type PendingFile = { file: File; title: string };
 
 export function AddContentForm({ unitId }: { unitId: string }) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<"paste" | "upload">("paste");
   const [title, setTitle] = useState("");
   const [contentKind, setContentKind] = useState<"NOTES" | "PAST_PAPER">("NOTES");
@@ -20,6 +21,7 @@ export function AddContentForm({ unitId }: { unitId: string }) {
   const [customPurpose, setCustomPurpose] = useState("");
   const [text, setText] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -28,7 +30,9 @@ export function AddContentForm({ unitId }: { unitId: string }) {
 
   function addFiles(fileList: FileList | null) {
     if (!fileList) return;
-    const additions = Array.from(fileList).map((file) => ({ file, title: titleFromFilename(file.name) }));
+    const additions = Array.from(fileList)
+      .filter((file) => /\.(pdf|docx)$/i.test(file.name))
+      .map((file) => ({ file, title: titleFromFilename(file.name) }));
     setPendingFiles((prev) => [...prev, ...additions]);
   }
 
@@ -38,6 +42,12 @@ export function AddContentForm({ unitId }: { unitId: string }) {
 
   function renamePendingFile(index: number, newTitle: string) {
     setPendingFiles((prev) => prev.map((p, i) => (i === index ? { ...p, title: newTitle } : p)));
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragActive(false);
+    addFiles(event.dataTransfer.files);
   }
 
   async function uploadOne(pending: PendingFile): Promise<string | null> {
@@ -136,19 +146,19 @@ export function AddContentForm({ unitId }: { unitId: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
       <div className="flex gap-2 text-sm">
         <button
           type="button"
           onClick={() => setMode("paste")}
-          className={`rounded-md px-3 py-1.5 ${mode === "paste" ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900" : "border border-zinc-300 dark:border-zinc-700"}`}
+          className={`rounded-md px-3 py-1.5 transition-colors ${mode === "paste" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
         >
           Paste text
         </button>
         <button
           type="button"
           onClick={() => setMode("upload")}
-          className={`rounded-md px-3 py-1.5 ${mode === "upload" ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900" : "border border-zinc-300 dark:border-zinc-700"}`}
+          className={`rounded-md px-3 py-1.5 transition-colors ${mode === "upload" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
         >
           Upload PDF/DOCX
         </button>
@@ -159,17 +169,17 @@ export function AddContentForm({ unitId }: { unitId: string }) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Title (e.g. Lecture 3 notes, CAT 1 2025 paper)"
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded-md border border-border bg-background px-3 py-2 text-sm"
         />
       )}
 
       <div className="flex flex-wrap gap-4 text-sm">
         <label className="flex items-center gap-2">
-          <span className="text-zinc-500">Kind</span>
+          <span className="text-muted-foreground">Kind</span>
           <select
             value={contentKind}
             onChange={(e) => setContentKind(e.target.value as "NOTES" | "PAST_PAPER")}
-            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+            className="rounded-md border border-border bg-background px-2 py-1"
           >
             <option value="NOTES">Notes / assignment</option>
             <option value="PAST_PAPER">Past CAT/exam paper</option>
@@ -177,11 +187,11 @@ export function AddContentForm({ unitId }: { unitId: string }) {
         </label>
 
         <label className="flex items-center gap-2">
-          <span className="text-zinc-500">Purpose</span>
+          <span className="text-muted-foreground">Purpose</span>
           <select
             value={purpose}
             onChange={(e) => setPurpose(e.target.value)}
-            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+            className="rounded-md border border-border bg-background px-2 py-1"
           >
             {PURPOSE_PRESETS.map((p) => (
               <option key={p} value={p}>
@@ -197,7 +207,7 @@ export function AddContentForm({ unitId }: { unitId: string }) {
             value={customPurpose}
             onChange={(e) => setCustomPurpose(e.target.value)}
             placeholder="e.g. CAT3"
-            className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="rounded-md border border-border bg-background px-2 py-1 text-sm"
           />
         )}
       </div>
@@ -208,35 +218,66 @@ export function AddContentForm({ unitId }: { unitId: string }) {
           onChange={(e) => setText(e.target.value)}
           placeholder="Paste notes, assignment, or past paper text here…"
           rows={10}
-          className="rounded-md border border-zinc-300 px-3 py-2 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded-md border border-border bg-background px-3 py-2 font-mono text-xs"
         />
       ) : (
-        <div className="flex flex-col gap-2">
-          <input
-            type="file"
-            multiple
-            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            onChange={(e) => {
-              addFiles(e.target.files);
-              e.target.value = "";
+        <div className="flex flex-col gap-3">
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragActive(true);
             }}
-            className="text-sm"
-          />
-          <p className="text-xs text-zinc-400">Kind and purpose above apply to all selected files.</p>
+            onDragLeave={() => setDragActive(false)}
+            onDrop={handleDrop}
+            className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors ${
+              dragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+            }`}
+          >
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              className="text-muted-foreground"
+            >
+              <path d="M12 16V4m0 0L7 9m5-5l5 5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <p className="text-sm">
+              <span className="font-medium text-primary">Click to browse</span>{" "}
+              <span className="text-muted-foreground">or drag PDF/DOCX files here</span>
+            </p>
+            <p className="text-xs text-muted-foreground">Kind and purpose above apply to all selected files.</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={(e) => {
+                addFiles(e.target.files);
+                e.target.value = "";
+              }}
+              className="hidden"
+            />
+          </div>
+
           {pendingFiles.length > 0 && (
             <ul className="flex flex-col gap-2">
               {pendingFiles.map((p, i) => (
-                <li key={i} className="flex items-center gap-2">
+                <li key={i} className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5">
                   <input
                     value={p.title}
                     onChange={(e) => renamePendingFile(i, e.target.value)}
-                    className="flex-1 rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                    className="flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm focus:border-border focus:outline-none"
                   />
-                  <span className="text-xs text-zinc-400">{p.file.name}</span>
+                  <span className="text-xs text-muted-foreground">{p.file.name}</span>
                   <button
                     type="button"
                     onClick={() => removePendingFile(i)}
-                    className="text-xs text-red-600 hover:underline"
+                    className="text-xs text-danger hover:underline"
                   >
                     Remove
                   </button>
@@ -247,9 +288,9 @@ export function AddContentForm({ unitId }: { unitId: string }) {
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       {progress && (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-muted-foreground">
           Uploading {progress.done}/{progress.total}…
         </p>
       )}
@@ -257,7 +298,7 @@ export function AddContentForm({ unitId }: { unitId: string }) {
       <button
         type="submit"
         disabled={submitting}
-        className="self-start rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+        className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-50"
       >
         {submitting
           ? "Adding…"

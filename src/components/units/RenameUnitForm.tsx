@@ -45,7 +45,7 @@ export function RenameUnitForm({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="self-start text-xs text-zinc-500 hover:underline"
+        className="self-start text-xs text-muted-foreground hover:underline"
       >
         Rename / edit description
       </button>
@@ -53,26 +53,26 @@ export function RenameUnitForm({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+    <div className="flex flex-col gap-2 rounded-md border border-border bg-card p-3">
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
       />
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         rows={2}
         placeholder="Description (optional)"
-        className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
       />
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
       <div className="flex gap-2">
         <button
           type="button"
           onClick={save}
           disabled={saving}
-          className="rounded-md bg-zinc-900 px-3 py-1 text-xs font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save"}
         </button>
@@ -84,7 +84,7 @@ export function RenameUnitForm({
             setDescription(initialDescription ?? "");
             setError(null);
           }}
-          className="rounded-md border border-zinc-300 px-3 py-1 text-xs dark:border-zinc-700"
+          className="rounded-md border border-border px-3 py-1 text-xs"
         >
           Cancel
         </button>
