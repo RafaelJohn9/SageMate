@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { AnsweringPanel } from "@/components/question-sets/AnsweringPanel";
+import { formatRelativeTime } from "@/lib/formatRelativeTime";
 
 export default async function QuestionSetDetailPage({
   params,
@@ -50,7 +51,8 @@ export default async function QuestionSetDetailPage({
         </Link>
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{questionSet.name}</h1>
         <p className="text-xs text-zinc-400">
-          {questionSet.status} · purpose: {questionSet.purposeFilter} · {questionSet.provider}/{questionSet.model}
+          Generated {formatRelativeTime(questionSet.createdAt)} · {questionSet.status.toLowerCase()} · purpose:{" "}
+          {questionSet.purposeFilter} · {questionSet.provider}/{questionSet.model}
         </p>
         <div className="mt-2 flex flex-wrap gap-3 text-xs">
           <a

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { DeleteContentButton } from "@/components/content/DeleteContentButton";
 import { RenameUnitForm } from "@/components/units/RenameUnitForm";
+import { formatRelativeTime } from "@/lib/formatRelativeTime";
 
 export default async function UnitDetailPage({
   params,
@@ -14,7 +15,12 @@ export default async function UnitDetailPage({
     where: { id: unitId },
     include: {
       content: { orderBy: { createdAt: "desc" } },
-      questionSets: { orderBy: { createdAt: "desc" } },
+      questionSets: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          questions: { include: { _count: { select: { attempts: true } } } },
+        },
+      },
     },
   });
 
@@ -54,6 +60,7 @@ export default async function UnitDetailPage({
                   <span className="text-zinc-400">
                     ({c.contentKind === "PAST_PAPER" ? "past paper" : "notes"} · {c.purpose})
                   </span>
+                  <p className="text-xs text-zinc-400">Added {formatRelativeTime(c.createdAt)}</p>
                 </div>
                 <DeleteContentButton contentId={c.id} />
               </li>
@@ -73,14 +80,22 @@ export default async function UnitDetailPage({
           <p className="text-sm text-zinc-500">No question sets generated yet.</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {unit.questionSets.map((qs) => (
-              <li key={qs.id} className="rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
-                <Link href={`/question-sets/${qs.id}`} className="font-medium hover:underline">
-                  {qs.name}
-                </Link>{" "}
-                <span className="text-zinc-400">({qs.status.toLowerCase()})</span>
-              </li>
-            ))}
+            {unit.questionSets.map((qs) => {
+              const total = qs.questions.length;
+              const answered = qs.questions.filter((q) => q._count.attempts > 0).length;
+              return (
+                <li key={qs.id} className="rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
+                  <Link href={`/question-sets/${qs.id}`} className="font-medium hover:underline">
+                    {qs.name}
+                  </Link>{" "}
+                  <span className="text-zinc-400">({qs.status.toLowerCase()})</span>
+                  <p className="text-xs text-zinc-400">
+                    Generated {formatRelativeTime(qs.createdAt)} · {answered}/{total} answered · purpose:{" "}
+                    {qs.purposeFilter}
+                  </p>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
