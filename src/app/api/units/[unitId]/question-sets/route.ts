@@ -53,6 +53,14 @@ export async function POST(request: Request, { params }: RouteParams) {
 
   const llm = getLLMProvider();
 
+  const priorQuestionRows = await db.question.findMany({
+    where: { questionSet: { unitId } },
+    orderBy: { createdAt: "desc" },
+    take: 40,
+    select: { text: true },
+  });
+  const priorQuestions = priorQuestionRows.map((q) => q.text);
+
   const questionSet = await db.questionSet.create({
     data: {
       unitId,
@@ -71,6 +79,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       purpose: purposeFilter.join(","),
       notesText: notesText || "(no notes provided — rely on past paper style and general unit context)",
       pastPaperText,
+      priorQuestions,
       count,
     });
 

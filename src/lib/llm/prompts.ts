@@ -43,6 +43,13 @@ export function buildGenerateQuestionsPrompt(input: GenerateQuestionsInput): {
       )}`
     : "(No past paper examples were provided — use a standard, clear essay-question style.)";
 
+  const priorQuestionsSection =
+    input.priorQuestions && input.priorQuestions.length > 0
+      ? `PREVIOUSLY ASKED QUESTIONS FOR THIS UNIT (across earlier revision sets):\n${input.priorQuestions
+          .map((q, i) => `${i + 1}. ${q}`)
+          .join("\n")}`
+      : "(No prior questions recorded for this unit yet.)";
+
   const user = `
 UNIT: ${input.unitTitle}
 PURPOSE: ${input.purpose}
@@ -51,6 +58,8 @@ SOURCE NOTES:
 ${truncate(input.notesText, MAX_SOURCE_CHARS)}
 
 ${pastPaperSection}
+
+${priorQuestionsSection}
 
 TASK:
 1. If past paper examples were provided above, first analyze them internally to infer typical
@@ -62,6 +71,12 @@ TASK:
 3. The first ${conceptualCount} questions must be CONCEPTUAL (recall, explain, compare, describe).
 ${applicationCount > 0 ? `4. The final ${applicationCount} questions must be APPLICATION questions — apply a concept from the notes to a concrete scenario, problem, or case (not pure recall).` : ""}
 5. Do not copy or closely paraphrase any past paper question verbatim.
+6. Check the PREVIOUSLY ASKED QUESTIONS list above. Do not repeat any of them near-verbatim. Some
+   topic overlap across revision sets is fine and expected — the same concept can reasonably be
+   tested again. But if a topic or command-verb/phrasing pattern already appears several times in
+   that list, take a noticeably different, more creative angle this time: a different sub-aspect,
+   a different scenario or example, a different depth, or a different command verb — rather than
+   rephrasing the same question.
 
 ${MARKING_SCHEME_RULES}
 

@@ -3,6 +3,7 @@ export interface GenerateQuestionsInput {
   purpose: string;
   notesText: string;
   pastPaperText?: string;
+  priorQuestions?: string[];
   count: number;
 }
 
