@@ -43,12 +43,17 @@ export async function POST(request: Request, { params }: RouteParams) {
     const sourceText = await getQuestionSetSourceText(setId);
 
     const results = await llm.gradeAnswerBatch(
-      attempts.map((attempt, i) => ({
-        refId: attempt.id,
-        questionText: questionById.get(answers[i].questionId)?.text ?? "",
-        sourceText,
-        answerText: attempt.answerText,
-      })),
+      attempts.map((attempt, i) => {
+        const question = questionById.get(answers[i].questionId);
+        return {
+          refId: attempt.id,
+          questionText: question?.text ?? "",
+          sourceText,
+          answerText: attempt.answerText,
+          marks: question?.marks ?? undefined,
+          markingScheme: question?.markingScheme ?? undefined,
+        };
+      }),
     );
     const resultByAttemptId = new Map(results.map((r) => [r.refId, r]));
 
@@ -60,6 +65,7 @@ export async function POST(request: Request, { params }: RouteParams) {
           data: {
             attemptId: attempt.id,
             score: result.score,
+            marksAwarded: result.marksAwarded ?? null,
             feedback: result.feedback,
             modelAnswer: result.modelAnswer,
             provider: llm.name,

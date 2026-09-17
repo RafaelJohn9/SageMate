@@ -18,6 +18,8 @@ import type {
 const generatedQuestionSchema = z.object({
   text: z.string().min(1),
   questionType: z.enum(["CONCEPTUAL", "APPLICATION"]),
+  marks: z.number().int().min(1),
+  markingScheme: z.string().min(1),
 });
 const generateQuestionsResponseSchema = z.object({
   questions: z.array(generatedQuestionSchema),
@@ -25,6 +27,7 @@ const generateQuestionsResponseSchema = z.object({
 
 const gradingResultSchema = z.object({
   score: z.number().min(0).max(100),
+  marksAwarded: z.number().int().min(0).nullable().optional(),
   feedback: z.string().min(1),
   modelAnswer: z.string().optional(),
 });

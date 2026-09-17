@@ -7,6 +7,22 @@ function truncate(text: string, maxChars: number): string {
   return `${text.slice(0, maxChars)}\n\n[...truncated, source material continues beyond this point...]`;
 }
 
+const MARKING_SCHEME_RULES = `
+MARKING SCHEME RULES (assign marks per question following exam-marking convention):
+- "Differentiate between" / "Distinguish between" / "Compare" questions: 2 marks per point of
+  difference (1 mark for correctly stating the point, 1 mark for explaining/elaborating it).
+- "Explain" / "Discuss" / "Describe" / "Analyze" / "Evaluate" / "Justify" questions: 2 marks per
+  point (1 mark for stating the point, 1 mark for its explanation).
+- "Outline" / "List" / "State" / "Identify" questions: 1 mark per point (no explanation required).
+- Application questions: apply the same convention based on the question's own command verb and
+  the number of distinct points a full answer requires.
+Decide how many points a complete answer needs (typically 2-4, grounded in the source material's
+depth on that topic), then compute marks = points × marks-per-point per the rules above.
+Write a concise "markingScheme" string describing the breakdown, e.g. "4 marks: 2 points of
+difference x 2 marks each (1 for the point, 1 for its explanation)" or "3 marks: 3 points x 1 mark
+each". This is shown to the student to help them structure a complete answer.
+`.trim();
+
 export function buildGenerateQuestionsPrompt(input: GenerateQuestionsInput): {
   system: string;
   user: string;
@@ -47,12 +63,25 @@ TASK:
 ${applicationCount > 0 ? `4. The final ${applicationCount} questions must be APPLICATION questions — apply a concept from the notes to a concrete scenario, problem, or case (not pure recall).` : ""}
 5. Do not copy or closely paraphrase any past paper question verbatim.
 
+${MARKING_SCHEME_RULES}
+
 Return ONLY a JSON object of this exact shape:
-{"questions": [{"text": string, "questionType": "CONCEPTUAL" | "APPLICATION"}, ...]}
+{"questions": [{"text": string, "questionType": "CONCEPTUAL" | "APPLICATION", "marks": number, "markingScheme": string}, ...]}
 The "questions" array must contain exactly ${input.count} items, in the order described above.
 `.trim();
 
   return { system, user };
+}
+
+function markingSchemeSection(input: GradeAnswerInput): string {
+  if (!input.marks || !input.markingScheme) {
+    return "(No marking scheme available for this question — grade holistically from 0-100.)";
+  }
+  return `This question is worth ${input.marks} marks. Marking scheme: ${input.markingScheme}
+Award marksAwarded as a whole number from 0 to ${input.marks} by checking the answer point-by-point
+against the marking scheme above — do not award partial marks within a single point (e.g. for a
+"1 mark for the point, 1 mark for the explanation" item, award 0, 1, or 2 for that item, never 0.5).
+Then set score = round(marksAwarded / ${input.marks} * 100).`;
 }
 
 export function buildGradeAnswerPrompt(input: GradeAnswerInput): { system: string; user: string } {
@@ -72,11 +101,14 @@ ${input.questionText}
 STUDENT ANSWER:
 ${input.answerText}
 
-Grade the student answer from 0-100 and give constructive feedback explaining what was right,
-what was missing or incorrect, and how to improve. Include a concise correct/model answer.
+${markingSchemeSection(input)}
+
+Give constructive feedback explaining what was right, what was missing or incorrect (tied to the
+marking scheme's points where applicable), and how to improve. Include a concise correct/model answer.
 
 Return ONLY a JSON object of this exact shape:
-{"score": number, "feedback": string, "modelAnswer": string}
+{"score": number, "marksAwarded": number | null, "feedback": string, "modelAnswer": string}
+Set "marksAwarded" to null only if no marking scheme was given above.
 `.trim();
 
   return { system, user };
@@ -88,7 +120,7 @@ export function buildGradeAnswerBatchPrompt(items: GradeAnswerBatchItem[]): {
 } {
   const system = [
     "You are a fair, rigorous grader for open-ended exam/revision answers.",
-    "You will grade multiple question/answer pairs in one pass. Judge each against its own source material.",
+    "You will grade multiple question/answer pairs in one pass. Judge each against its own source material and marking scheme.",
     "Return ONLY strict JSON matching the requested schema. No prose, no markdown fences.",
   ].join(" ");
 
@@ -102,18 +134,22 @@ QUESTION:
 ${item.questionText}
 
 STUDENT ANSWER:
-${item.answerText}`,
+${item.answerText}
+
+${markingSchemeSection(item)}`,
     )
     .join("\n\n");
 
   const user = `
-Grade each of the following ${items.length} question/answer pairs independently, from 0-100, with
-constructive feedback and a concise model answer for each.
+Grade each of the following ${items.length} question/answer pairs independently, with constructive
+feedback and a concise model answer for each. For each item, follow its own marking scheme
+instructions above to compute marksAwarded and score (or grade holistically 0-100 with
+marksAwarded: null if no marking scheme was given for that item).
 
 ${itemsBlock}
 
 Return ONLY a JSON object of this exact shape:
-{"results": [{"refId": string, "score": number, "feedback": string, "modelAnswer": string}, ...]}
+{"results": [{"refId": string, "score": number, "marksAwarded": number | null, "feedback": string, "modelAnswer": string}, ...]}
 The "results" array must contain exactly one entry per item above, using the same "refId" values.
 `.trim();
 

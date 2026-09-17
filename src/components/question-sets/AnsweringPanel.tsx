@@ -3,15 +3,29 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-type GradingResult = { score: number; feedback: string; modelAnswer?: string | null };
+type GradingResult = {
+  score: number;
+  marksAwarded?: number | null;
+  feedback: string;
+  modelAnswer?: string | null;
+};
 
 type QuestionData = {
   id: string;
   orderIndex: number;
   text: string;
   questionType: "CONCEPTUAL" | "APPLICATION";
+  marks: number | null;
+  markingScheme: string | null;
   latestAttempt: { answerText: string; grading: GradingResult | null } | null;
 };
+
+function formatScore(result: GradingResult, marks: number | null): string {
+  if (result.marksAwarded != null && marks != null) {
+    return `${result.marksAwarded}/${marks} marks`;
+  }
+  return `${result.score}/100`;
+}
 
 type HistoryAttempt = {
   id: string;
@@ -185,6 +199,9 @@ export function AnsweringPanel({ questions, setId }: { questions: QuestionData[]
                 >
                   {q.questionType === "APPLICATION" ? "Application" : "Conceptual"}
                 </span>
+                {q.marks != null && (
+                  <span className="text-xs text-muted-foreground">({q.marks} marks)</span>
+                )}
                 <button
                   type="button"
                   onClick={() => toggleHistory(q.id)}
@@ -215,12 +232,18 @@ export function AnsweringPanel({ questions, setId }: { questions: QuestionData[]
               )}
               {result && (
                 <div className="mt-3 rounded-md border border-success/30 bg-success-tint p-3 text-sm">
-                  <p className="font-medium text-success">Score: {result.score}/100</p>
+                  <p className="font-medium text-success">Score: {formatScore(result, q.marks)}</p>
                   <p className="mt-1 text-foreground">{result.feedback}</p>
                   {result.modelAnswer && (
                     <p className="mt-2 text-muted-foreground">
                       <span className="font-medium">Model answer: </span>
                       {result.modelAnswer}
+                    </p>
+                  )}
+                  {q.markingScheme && (
+                    <p className="mt-2 text-muted-foreground">
+                      <span className="font-medium">Marking scheme: </span>
+                      {q.markingScheme}
                     </p>
                   )}
                 </div>
@@ -237,7 +260,7 @@ export function AnsweringPanel({ questions, setId }: { questions: QuestionData[]
                     <div key={attempt.id} className="rounded-md bg-background p-2 text-xs">
                       <p className="text-muted-foreground">
                         {new Date(attempt.submittedAt).toLocaleString()} · {attempt.mode.toLowerCase()}
-                        {attempt.grading ? ` · ${attempt.grading.score}/100` : ""}
+                        {attempt.grading ? ` · ${formatScore(attempt.grading, q.marks)}` : ""}
                       </p>
                       <p className="mt-1 text-muted-foreground">{attempt.answerText}</p>
                     </div>

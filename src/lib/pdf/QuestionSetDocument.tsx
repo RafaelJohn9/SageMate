@@ -19,6 +19,7 @@ const styles = StyleSheet.create({
   questionHeader: { flexDirection: "row", alignItems: "center", marginBottom: 4, gap: 6 },
   questionNumber: { fontWeight: "bold" },
   badge: { fontSize: 8, color: "#555", borderWidth: 1, borderColor: "#ccc", borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1 },
+  marksText: { fontSize: 9, color: "#666" },
   questionText: { marginBottom: 6, lineHeight: 1.4 },
   answerLabel: { fontWeight: "bold", fontSize: 9, color: "#333", marginBottom: 2 },
   answerText: { marginBottom: 6, lineHeight: 1.4, color: "#222" },
@@ -32,9 +33,25 @@ export type PdfQuestion = {
   orderIndex: number;
   text: string;
   questionType: "CONCEPTUAL" | "APPLICATION";
+  marks?: number | null;
+  markingScheme?: string | null;
   answerText?: string | null;
-  grading?: { score: number; feedback: string; modelAnswer?: string | null } | null;
+  grading?: {
+    score: number;
+    marksAwarded?: number | null;
+    feedback: string;
+    modelAnswer?: string | null;
+  } | null;
 };
+
+function formatScore(q: PdfQuestion): string {
+  const grading = q.grading;
+  if (!grading) return "";
+  if (grading.marksAwarded != null && q.marks != null) {
+    return `${grading.marksAwarded}/${q.marks} marks`;
+  }
+  return `${grading.score}/100`;
+}
 
 export function QuestionSetDocument({
   setName,
@@ -60,6 +77,7 @@ export function QuestionSetDocument({
             <View style={styles.questionHeader}>
               <Text style={styles.questionNumber}>Q{q.orderIndex + 1}</Text>
               <Text style={styles.badge}>{q.questionType === "APPLICATION" ? "Application" : "Conceptual"}</Text>
+              {q.marks != null && <Text style={styles.marksText}>({q.marks} marks)</Text>}
             </View>
             <Text style={styles.questionText}>{q.text}</Text>
 
@@ -72,10 +90,13 @@ export function QuestionSetDocument({
 
             {withCorrections && q.grading && (
               <View style={styles.correctionBox}>
-                <Text style={styles.scoreLine}>Score: {q.grading.score}/100</Text>
+                <Text style={styles.scoreLine}>Score: {formatScore(q)}</Text>
                 <Text style={styles.feedbackText}>{q.grading.feedback}</Text>
                 {q.grading.modelAnswer && (
                   <Text style={styles.modelAnswerText}>Model answer: {q.grading.modelAnswer}</Text>
+                )}
+                {q.markingScheme && (
+                  <Text style={styles.modelAnswerText}>Marking scheme: {q.markingScheme}</Text>
                 )}
               </View>
             )}

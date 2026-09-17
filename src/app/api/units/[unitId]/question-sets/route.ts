@@ -85,6 +85,8 @@ export async function POST(request: Request, { params }: RouteParams) {
           text: q.text,
           orderIndex: index,
           questionType: q.questionType,
+          marks: q.marks,
+          markingScheme: q.markingScheme,
         })),
       }),
       db.questionSet.update({ where: { id: questionSet.id }, data: { status: "COMPLETED" } }),

@@ -88,6 +88,8 @@ model Question {
   text          String
   orderIndex    Int
   questionType  QuestionType @default(CONCEPTUAL)
+  marks         Int?
+  markingScheme String?
   createdAt     DateTime     @default(now())
   attempts      Attempt[]
 }
@@ -108,13 +110,14 @@ model Attempt {
 }
 
 model Grading {
-  id          String   @id @default(cuid())
-  attemptId   String   @unique
-  attempt     Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  score       Int
-  feedback    String
-  modelAnswer String?
-  provider    String
-  model       String
-  gradedAt    DateTime @default(now())
+  id           String   @id @default(cuid())
+  attemptId    String   @unique
+  attempt      Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  score        Int
+  marksAwarded Int?
+  feedback     String
+  modelAnswer  String?
+  provider     String
+  model        String
+  gradedAt     DateTime @default(now())
 }

@@ -41,11 +41,14 @@ export async function POST(request: Request, { params }: RouteParams) {
       questionText: question.text,
       sourceText,
       answerText: parsed.data.answerText,
+      marks: question.marks ?? undefined,
+      markingScheme: question.markingScheme ?? undefined,
     });
     const grading = await db.grading.create({
       data: {
         attemptId: attempt.id,
         score: result.score,
+        marksAwarded: result.marksAwarded ?? null,
         feedback: result.feedback,
         modelAnswer: result.modelAnswer,
         provider: llm.name,

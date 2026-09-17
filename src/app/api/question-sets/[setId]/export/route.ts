@@ -37,10 +37,13 @@ export async function GET(request: Request, { params }: RouteParams) {
       orderIndex: q.orderIndex,
       text: sanitizeForPdf(q.text),
       questionType: q.questionType,
+      marks: q.marks,
+      markingScheme: q.markingScheme ? sanitizeForPdf(q.markingScheme) : null,
       answerText: latest ? sanitizeForPdf(latest.answerText) : null,
       grading: latest?.grading
         ? {
             score: latest.grading.score,
+            marksAwarded: latest.grading.marksAwarded,
             feedback: sanitizeForPdf(latest.grading.feedback),
             modelAnswer: latest.grading.modelAnswer ? sanitizeForPdf(latest.grading.modelAnswer) : null,
           }

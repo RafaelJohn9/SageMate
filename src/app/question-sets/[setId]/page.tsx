@@ -35,6 +35,8 @@ export default async function QuestionSetDetailPage({
     orderIndex: q.orderIndex,
     text: q.text,
     questionType: q.questionType,
+    marks: q.marks,
+    markingScheme: q.markingScheme,
     latestAttempt: q.attempts[0]
       ? {
           answerText: q.attempts[0].answerText,

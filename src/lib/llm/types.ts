@@ -11,16 +11,21 @@ export type QuestionTypeValue = "CONCEPTUAL" | "APPLICATION";
 export interface GeneratedQuestion {
   text: string;
   questionType: QuestionTypeValue;
+  marks: number;
+  markingScheme: string;
 }
 
 export interface GradeAnswerInput {
   questionText: string;
   sourceText: string;
   answerText: string;
+  marks?: number;
+  markingScheme?: string;
 }
 
 export interface GradingResult {
   score: number;
+  marksAwarded?: number | null;
   feedback: string;
   modelAnswer?: string;
 }
