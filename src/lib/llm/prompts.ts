@@ -1,11 +1,14 @@
 import type {
   DiscussAnswerInput,
+  ExtractQuestionsInput,
   GenerateQuestionsInput,
+  GenerateRevisionQAInput,
   GradeAnswerBatchItem,
   GradeAnswerInput,
 } from "./types";
 
 const MAX_SOURCE_CHARS = 12000;
+const MAX_EXTRACT_SOURCE_CHARS = 30000;
 
 function truncate(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
@@ -88,6 +91,117 @@ ${MARKING_SCHEME_RULES}
 Return ONLY a JSON object of this exact shape:
 {"questions": [{"text": string, "questionType": "CONCEPTUAL" | "APPLICATION", "marks": number, "markingScheme": string}, ...]}
 The "questions" array must contain exactly ${input.count} items, in the order described above.
+`.trim();
+
+  return { system, user };
+}
+
+export function buildExtractQuestionsPrompt(input: ExtractQuestionsInput): {
+  system: string;
+  user: string;
+} {
+  const system = [
+    "You extract exam/revision questions that already appear in a student's study material.",
+    "You never invent new questions — you only pull out questions that are written in the source.",
+    "Return ONLY strict JSON matching the requested schema. No prose, no markdown fences.",
+  ].join(" ");
+
+  const user = `
+UNIT: ${input.unitTitle}
+
+SOURCE MATERIAL:
+${truncate(input.sourceText, MAX_EXTRACT_SOURCE_CHARS)}
+
+TASK:
+1. Find every question already written in the SOURCE MATERIAL above (e.g. numbered exam questions,
+   end-of-topic questions, review/revision questions, "Discuss…", "Explain…", "What is…?").
+   Ignore the explanatory notes, answers, and worked solutions — take the questions only.
+2. Copy each question's wording as written. Only clean it up: remove the leading number/letter
+   (e.g. "1.", "Q3", "(b)") and any trailing marks annotation (e.g. "(4 marks)", "[6mks]"), and fix
+   obvious text-extraction artefacts such as broken line wraps.
+3. Every question must make sense on its own. A question often starts with one or more context
+   sentences BEFORE the command verb — copy the WHOLE question, starting from its first sentence,
+   not just from the command verb. Also include any scenario, case study, or data it refers to
+   (e.g. "Task A", "the company above"). Never leave a dangling reference like "this transaction".
+   Do not include section or question headings/titles (e.g. "Question 2: The Economics of X").
+   Example — source:
+     "Question 2: Asset Sales
+      When a company sells assets to a vendor at book value, the price is often above market value.
+      Explain the financial mechanism of this transaction."
+   Correct text: "When a company sells assets to a vendor at book value, the price is often above
+   market value. Explain the financial mechanism of this transaction."
+   Wrong text: "Explain the financial mechanism of this transaction."
+   If a question has sub-parts, output each sub-part as its own question, each prefixed with the
+   shared stem/scenario.
+4. Skip exam instructions (e.g. "Answer ALL questions", "Time: 2 hours") and exact duplicates.
+5. Keep the questions in the order they appear in the source.
+6. Classify each as "CONCEPTUAL" (recall, explain, compare, describe) or "APPLICATION" (apply a
+   concept to a scenario, case, problem, or calculation).
+7. If the source shows marks for a question, use exactly those marks. Otherwise assign marks using
+   the rules below.
+
+${MARKING_SCHEME_RULES}
+
+Return ONLY a JSON object of this exact shape:
+{"questions": [{"text": string, "questionType": "CONCEPTUAL" | "APPLICATION", "marks": number, "markingScheme": string}, ...]}
+If the source contains no questions, return {"questions": []}.
+`.trim();
+
+  return { system, user };
+}
+
+export function buildRevisionQAPrompt(
+  input: GenerateRevisionQAInput & { count: number; part: number; totalParts: number },
+): { system: string; user: string } {
+  const applicationCount = Math.max(1, Math.round(input.count * 0.2));
+
+  const system = [
+    "You are an experienced lecturer writing a revision question bank with full model answers.",
+    "Questions are open-ended (never multiple-choice). Answers must be accurate and grounded in the source.",
+    "Return ONLY strict JSON matching the requested schema. No prose, no markdown fences.",
+  ].join(" ");
+
+  const partLine =
+    input.totalParts > 1
+      ? `This is part ${input.part} of ${input.totalParts} of the student's material; other parts are handled separately, so cover only what is in this part.`
+      : "";
+
+  const user = `
+UNIT: ${input.unitTitle}
+PURPOSE: ${input.purpose}
+${partLine}
+
+SOURCE MATERIAL:
+${input.sourceText}
+
+TASK:
+1. Write exactly ${input.count} revision questions, each with a complete model answer, grounded in the
+   SOURCE MATERIAL above.
+2. Cover the material systematically from start to finish — every major topic, definition, process,
+   comparison and example should be tested by at least one question. Do not cluster on one topic and
+   do not repeat the same question in different words.
+3. Keep the questions in the order their topics appear in the source.
+4. About ${applicationCount} of the questions should be "APPLICATION" (apply a concept to a scenario,
+   case, problem or calculation); the rest "CONCEPTUAL" (define, explain, compare, describe). Spread the
+   application questions through the set rather than putting them all at the end.
+5. Vary the command verbs the way a real exam does ("Define", "Explain", "Differentiate between",
+   "Discuss", "Outline", "Describe with examples"…).
+6. If the source contains past-paper questions, you may use them as style reference, but write your
+   own questions and answers.
+
+${MARKING_SCHEME_RULES}
+
+ANSWER RULES:
+- "answer" is the model answer a student would memorise to score full marks. It must contain exactly
+  the points the marking scheme counts, each stated and (where the scheme awards it) explained.
+- Use Markdown: a short lead sentence where helpful, then a bullet or numbered list with one point per
+  item, bold key terms. No headings, no HTML.
+- Use facts, terms and examples from the source. If you must add a widely accepted fact the source
+  omits, keep it brief and accurate.
+
+Return ONLY a JSON object of this exact shape:
+{"questions": [{"text": string, "questionType": "CONCEPTUAL" | "APPLICATION", "marks": number, "markingScheme": string, "answer": string}, ...]}
+The "questions" array must contain exactly ${input.count} items.
 `.trim();
 
   return { system, user };

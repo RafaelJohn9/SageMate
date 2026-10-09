@@ -89,8 +89,15 @@ export default async function UnitDetailPage({
                     {qs.name}
                   </Link>{" "}
                   <span className="text-muted-foreground">({qs.status.toLowerCase()})</span>
+                  {qs.kind === "REVISION" && (
+                    <span className="ml-2 rounded-full bg-mark-tint px-2 py-0.5 text-xs text-mark">
+                      Revision Q&amp;A
+                    </span>
+                  )}
                   <p className="text-xs text-muted-foreground">
-                    Generated {formatRelativeTime(qs.createdAt)} · {answered}/{total} answered · purpose:{" "}
+                    Generated {formatRelativeTime(qs.createdAt)} ·{" "}
+                    {qs.kind === "REVISION" ? `${total} questions with answers` : `${answered}/${total} answered`} ·
+                    purpose:{" "}
                     {qs.purposeFilter}
                   </p>
                 </li>

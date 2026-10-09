@@ -10,6 +10,7 @@ export async function GET(request: Request, { params }: RouteParams) {
   const url = new URL(request.url);
   const withAnswers = url.searchParams.get("withAnswers") === "true";
   const withCorrections = url.searchParams.get("withCorrections") === "true";
+  const withModelAnswers = url.searchParams.get("withModelAnswers") === "true";
 
   const questionSet = await db.questionSet.findUnique({
     where: { id: setId },
@@ -39,6 +40,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       questionType: q.questionType,
       marks: q.marks,
       markingScheme: q.markingScheme ? sanitizeForPdf(q.markingScheme) : null,
+      modelAnswer: q.answer ? sanitizeForPdf(q.answer) : null,
       answerText: latest ? sanitizeForPdf(latest.answerText) : null,
       grading: latest?.grading
         ? {
@@ -57,6 +59,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     questions: pdfQuestions,
     withAnswers,
     withCorrections: withCorrections && withAnswers,
+    withModelAnswers,
   });
 
   const safeName = questionSet.name.replace(/[^a-z0-9-_ ]/gi, "").trim() || "question-set";

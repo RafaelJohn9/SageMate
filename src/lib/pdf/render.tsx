@@ -7,6 +7,7 @@ export async function renderQuestionSetPdf(input: {
   questions: PdfQuestion[];
   withAnswers: boolean;
   withCorrections: boolean;
+  withModelAnswers?: boolean;
 }): Promise<Buffer> {
   return renderToBuffer(<QuestionSetDocument {...input} />);
 }

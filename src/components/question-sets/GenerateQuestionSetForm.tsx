@@ -2,12 +2,22 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
+import { revisionQuestionCount } from "@/lib/llm/revisionPlan";
 
 type ContentOption = {
   id: string;
   title: string;
   purpose: string;
   contentKind: "NOTES" | "PAST_PAPER";
+  charCount: number;
+};
+
+type Mode = "generate" | "extract" | "revision";
+
+const FALLBACK_ERRORS: Record<Mode, string> = {
+  generate: "Could not generate questions.",
+  extract: "Could not extract questions.",
+  revision: "Could not create the revision set.",
 };
 
 export function GenerateQuestionSetForm({
@@ -25,7 +35,7 @@ export function GenerateQuestionSetForm({
   const [selectedContentIds, setSelectedContentIds] = useState<string[]>([]);
   const [count, setCount] = useState(10);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState<Mode | null>(null);
 
   function togglePurpose(p: string) {
     setSelectedPurposes((prev) => {
@@ -40,11 +50,20 @@ export function GenerateQuestionSetForm({
     setSelectedContentIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
+  const selectedChars = content
+    .filter((c) => selectedContentIds.includes(c.id))
+    .reduce((sum, c) => sum + c.charCount, 0);
+  const revisionCount = revisionQuestionCount(selectedChars);
+
   const visibleContent =
     selectedPurposes.length === 0 ? content : content.filter((c) => selectedPurposes.includes(c.purpose));
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    await submit("generate");
+  }
+
+  async function submit(mode: Mode) {
     setError(null);
 
     if (!name.trim()) {
@@ -60,7 +79,7 @@ export function GenerateQuestionSetForm({
       return;
     }
 
-    setSubmitting(true);
+    setSubmitting(mode);
     const res = await fetch(`/api/units/${unitId}/question-sets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -69,13 +88,14 @@ export function GenerateQuestionSetForm({
         purposeFilter: selectedPurposes,
         contentIds: selectedContentIds,
         count,
+        mode,
       }),
     });
-    setSubmitting(false);
+    setSubmitting(null);
 
     if (!res.ok) {
       const body = await res.json().catch(() => null);
-      const message = typeof body?.error === "string" ? body.error : "Could not generate questions.";
+      const message = typeof body?.error === "string" ? body.error : FALLBACK_ERRORS[mode];
       setError(message);
       return;
     }
@@ -153,13 +173,60 @@ export function GenerateQuestionSetForm({
 
       {error && <p className="text-sm text-danger">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-      >
-        {submitting ? "Generating…" : "Generate questions"}
-      </button>
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="submit"
+            disabled={submitting !== null}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >
+            {submitting === "generate" ? "Generating…" : "Generate questions"}
+          </button>
+          <button
+            type="button"
+            onClick={() => submit("extract")}
+            disabled={submitting !== null}
+            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground disabled:opacity-50"
+          >
+            {submitting === "extract" ? "Extracting…" : "Extract questions only"}
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Already have questions in your notes or past papers? &ldquo;Extract questions only&rdquo; pulls out the
+          questions as written (ignoring the notes and answers) instead of generating new ones. The number of
+          questions setting is ignored.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-md border border-mark/40 bg-mark-tint p-3">
+        <div>
+          <p className="text-sm font-medium text-foreground">Revision questions with answers</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            A full question bank covering everything you selected, each with a model answer to study from. The
+            more material you select, the more questions you get.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => submit("revision")}
+            disabled={submitting !== null}
+            className="rounded-md bg-mark px-4 py-2 text-sm font-medium text-mark-foreground disabled:opacity-50"
+          >
+            {submitting === "revision" ? `Writing ${revisionCount} questions and answers…` : "Create revision set"}
+          </button>
+          <span className="text-xs text-muted-foreground">
+            {selectedContentIds.length === 0
+              ? "Select content to see how many questions you’ll get."
+              : `About ${revisionCount} questions from your selection`}
+          </span>
+        </div>
+        {submitting === "revision" && revisionCount > 30 && (
+          <p className="text-xs text-muted-foreground">
+            Large selections are written in parts, so this can take a minute or two.
+          </p>
+        )}
+      </div>
     </form>
   );
 }

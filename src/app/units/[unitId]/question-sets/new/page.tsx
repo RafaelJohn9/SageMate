@@ -25,7 +25,16 @@ export default async function NewQuestionSetPage({
         </Link>
         <h1 className="font-serif text-2xl font-semibold text-foreground">Generate revision questions</h1>
       </header>
-      <GenerateQuestionSetForm unitId={unitId} content={unit.content} />
+      <GenerateQuestionSetForm
+        unitId={unitId}
+        content={unit.content.map((c) => ({
+          id: c.id,
+          title: c.title,
+          purpose: c.purpose,
+          contentKind: c.contentKind,
+          charCount: c.rawText.length,
+        }))}
+      />
     </div>
   );
 }

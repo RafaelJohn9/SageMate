@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getLLMProvider } from "@/lib/llm/factory";
+import type { GeneratedQuestion } from "@/lib/llm/types";
 import { createQuestionSetSchema } from "@/lib/validation/questionSets";
 
 type RouteParams = { params: Promise<{ unitId: string }> };
@@ -28,7 +29,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { name, purposeFilter, contentIds, count } = parsed.data;
+  const { name, purposeFilter, contentIds, count, mode } = parsed.data;
 
   const contentItems = await db.content.findMany({
     where: { id: { in: contentIds }, unitId },
@@ -53,12 +54,15 @@ export async function POST(request: Request, { params }: RouteParams) {
 
   const llm = getLLMProvider();
 
-  const priorQuestionRows = await db.question.findMany({
-    where: { questionSet: { unitId } },
-    orderBy: { createdAt: "desc" },
-    take: 40,
-    select: { text: true },
-  });
+  const priorQuestionRows =
+    mode === "generate"
+      ? await db.question.findMany({
+          where: { questionSet: { unitId } },
+          orderBy: { createdAt: "desc" },
+          take: 40,
+          select: { text: true },
+        })
+      : [];
   const priorQuestions = priorQuestionRows.map((q) => q.text);
 
   const questionSet = await db.questionSet.create({
@@ -66,6 +70,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       unitId,
       name,
       purposeFilter: purposeFilter.join(","),
+      kind: mode === "revision" ? "REVISION" : "PRACTICE",
       status: "PENDING",
       provider: llm.name,
       model: llm.model,
@@ -73,18 +78,31 @@ export async function POST(request: Request, { params }: RouteParams) {
     },
   });
 
+  const allSourceText = contentItems.map((c) => `## ${c.title}\n${c.rawText}`).join("\n\n");
+
   try {
-    const generated = await llm.generateQuestions({
-      unitTitle: unit.name,
-      purpose: purposeFilter.join(","),
-      notesText: notesText || "(no notes provided — rely on past paper style and general unit context)",
-      pastPaperText,
-      priorQuestions,
-      count,
-    });
+    const generated: (GeneratedQuestion & { answer?: string })[] =
+      mode === "extract"
+        ? await llm.extractQuestions({ unitTitle: unit.name, sourceText: allSourceText })
+        : mode === "revision"
+          ? await llm.generateRevisionQA({
+              unitTitle: unit.name,
+              purpose: purposeFilter.join(","),
+              sourceText: allSourceText,
+            })
+          : await llm.generateQuestions({
+              unitTitle: unit.name,
+              purpose: purposeFilter.join(","),
+              notesText: notesText || "(no notes provided — rely on past paper style and general unit context)",
+              pastPaperText,
+              priorQuestions,
+              count,
+            });
 
     if (generated.length === 0) {
-      throw new Error("LLM returned no questions");
+      throw new Error(
+        mode === "extract" ? "No questions were found in the selected content" : "LLM returned no questions",
+      );
     }
 
     await db.$transaction([
@@ -96,6 +114,7 @@ export async function POST(request: Request, { params }: RouteParams) {
           questionType: q.questionType,
           marks: q.marks,
           markingScheme: q.markingScheme,
+          answer: q.answer ?? null,
         })),
       }),
       db.questionSet.update({ where: { id: questionSet.id }, data: { status: "COMPLETED" } }),

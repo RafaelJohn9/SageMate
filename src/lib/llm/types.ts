@@ -7,6 +7,17 @@ export interface GenerateQuestionsInput {
   count: number;
 }
 
+export interface ExtractQuestionsInput {
+  unitTitle: string;
+  sourceText: string;
+}
+
+export interface GenerateRevisionQAInput {
+  unitTitle: string;
+  purpose: string;
+  sourceText: string;
+}
+
 export type QuestionTypeValue = "CONCEPTUAL" | "APPLICATION";
 
 export interface GeneratedQuestion {
@@ -14,6 +25,10 @@ export interface GeneratedQuestion {
   questionType: QuestionTypeValue;
   marks: number;
   markingScheme: string;
+}
+
+export interface GeneratedRevisionQA extends GeneratedQuestion {
+  answer: string;
 }
 
 export interface GradeAnswerInput {
@@ -58,6 +73,8 @@ export interface LLMProvider {
   readonly name: string;
   readonly model: string;
   generateQuestions(input: GenerateQuestionsInput): Promise<GeneratedQuestion[]>;
+  extractQuestions(input: ExtractQuestionsInput): Promise<GeneratedQuestion[]>;
+  generateRevisionQA(input: GenerateRevisionQAInput): Promise<GeneratedRevisionQA[]>;
   gradeAnswer(input: GradeAnswerInput): Promise<GradingResult>;
   gradeAnswerBatch(items: GradeAnswerBatchItem[]): Promise<GradeAnswerBatchResult[]>;
   discussAnswer(input: DiscussAnswerInput): Promise<string>;

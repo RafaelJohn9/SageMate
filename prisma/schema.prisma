@@ -47,6 +47,11 @@ model Content {
   questionSets     QuestionSetContent[]
 }
 
+enum QuestionSetKind {
+  PRACTICE
+  REVISION
+}
+
 enum QuestionSetStatus {
   PENDING
   COMPLETED
@@ -59,6 +64,7 @@ model QuestionSet {
   unit          Unit                 @relation(fields: [unitId], references: [id], onDelete: Cascade)
   name          String
   purposeFilter String
+  kind          QuestionSetKind      @default(PRACTICE)
   status        QuestionSetStatus    @default(PENDING)
   provider      String
   model         String
@@ -90,6 +96,7 @@ model Question {
   questionType  QuestionType @default(CONCEPTUAL)
   marks         Int?
   markingScheme String?
+  answer        String?
   createdAt     DateTime     @default(now())
   attempts      Attempt[]
 }

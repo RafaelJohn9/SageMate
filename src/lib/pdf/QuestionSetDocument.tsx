@@ -35,6 +35,7 @@ export type PdfQuestion = {
   questionType: "CONCEPTUAL" | "APPLICATION";
   marks?: number | null;
   markingScheme?: string | null;
+  modelAnswer?: string | null;
   answerText?: string | null;
   grading?: {
     score: number;
@@ -53,18 +54,29 @@ function formatScore(q: PdfQuestion): string {
   return `${grading.score}/100`;
 }
 
+// Model answers are Markdown; PDFs show them as plain text with simple bullets.
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/__(.+?)__/g, "$1")
+    .replace(/^\s*[-*+]\s+/gm, "• ")
+    .replace(/`([^`]+)`/g, "$1");
+}
+
 export function QuestionSetDocument({
   setName,
   unitName,
   questions,
   withAnswers,
   withCorrections,
+  withModelAnswers = false,
 }: {
   setName: string;
   unitName: string;
   questions: PdfQuestion[];
   withAnswers: boolean;
   withCorrections: boolean;
+  withModelAnswers?: boolean;
 }) {
   return (
     <Document>
@@ -73,13 +85,23 @@ export function QuestionSetDocument({
         <Text style={styles.subtitle}>{unitName}</Text>
 
         {questions.map((q) => (
-          <View key={q.orderIndex} style={styles.question} wrap={false}>
+          <View key={q.orderIndex} style={styles.question} wrap={withModelAnswers}>
             <View style={styles.questionHeader}>
               <Text style={styles.questionNumber}>Q{q.orderIndex + 1}</Text>
               <Text style={styles.badge}>{q.questionType === "APPLICATION" ? "Application" : "Conceptual"}</Text>
               {q.marks != null && <Text style={styles.marksText}>({q.marks} marks)</Text>}
             </View>
             <Text style={styles.questionText}>{q.text}</Text>
+
+            {withModelAnswers && q.modelAnswer && (
+              <View style={styles.correctionBox}>
+                <Text style={styles.answerLabel}>Model answer</Text>
+                <Text style={styles.modelAnswerText}>{stripMarkdown(q.modelAnswer)}</Text>
+                {q.markingScheme && (
+                  <Text style={[styles.modelAnswerText, { marginTop: 4 }]}>Marking scheme: {q.markingScheme}</Text>
+                )}
+              </View>
+            )}
 
             {withAnswers && (
               <>

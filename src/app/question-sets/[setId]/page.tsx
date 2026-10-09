@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { AnsweringPanel } from "@/components/question-sets/AnsweringPanel";
+import { RevisionPanel } from "@/components/question-sets/RevisionPanel";
 import { formatRelativeTime } from "@/lib/formatRelativeTime";
 
 export default async function QuestionSetDetailPage({
@@ -37,6 +38,7 @@ export default async function QuestionSetDetailPage({
     questionType: q.questionType,
     marks: q.marks,
     markingScheme: q.markingScheme,
+    answer: q.answer,
     latestAttempt: q.attempts[0]
       ? {
           answerText: q.attempts[0].answerText,
@@ -44,6 +46,8 @@ export default async function QuestionSetDetailPage({
         }
       : null,
   }));
+
+  const isRevision = questionSet.kind === "REVISION";
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-12">
@@ -53,10 +57,18 @@ export default async function QuestionSetDetailPage({
         </Link>
         <h1 className="font-serif text-2xl font-semibold text-foreground">{questionSet.name}</h1>
         <p className="text-xs text-muted-foreground">
-          Generated {formatRelativeTime(questionSet.createdAt)} · {questionSet.status.toLowerCase()} · purpose:{" "}
+          {isRevision ? `Revision set of ${questionSet.questions.length} · ` : ""}Generated {formatRelativeTime(questionSet.createdAt)} · {questionSet.status.toLowerCase()} · purpose:{" "}
           {questionSet.purposeFilter} · {questionSet.provider}/{questionSet.model}
         </p>
         <div className="mt-2 flex flex-wrap gap-3 text-xs">
+          {isRevision && (
+            <a
+              href={`/api/question-sets/${questionSet.id}/export?withModelAnswers=true`}
+              className="text-primary hover:underline"
+            >
+              Export: questions + model answers (PDF)
+            </a>
+          )}
           <a
             href={`/api/question-sets/${questionSet.id}/export`}
             className="text-primary hover:underline"
@@ -78,7 +90,11 @@ export default async function QuestionSetDetailPage({
         </div>
       </header>
 
-      <AnsweringPanel setId={questionSet.id} questions={questionsWithLatest} />
+      {isRevision ? (
+        <RevisionPanel setId={questionSet.id} questions={questionsWithLatest} />
+      ) : (
+        <AnsweringPanel setId={questionSet.id} questions={questionsWithLatest} />
+      )}
     </div>
   );
 }
