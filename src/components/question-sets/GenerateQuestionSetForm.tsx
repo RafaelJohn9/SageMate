@@ -20,6 +20,20 @@ const FALLBACK_ERRORS: Record<Mode, string> = {
   revision: "Could not create the revision set.",
 };
 
+// The API returns either a plain string or zod's flattened errors ({ formErrors, fieldErrors }).
+function errorMessage(error: unknown): string | null {
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const { formErrors = [], fieldErrors = {} } = error as {
+      formErrors?: string[];
+      fieldErrors?: Record<string, string[] | undefined>;
+    };
+    const messages = [...formErrors, ...Object.values(fieldErrors).flatMap((m) => m ?? [])];
+    if (messages.length > 0) return messages.join(" ");
+  }
+  return null;
+}
+
 export function GenerateQuestionSetForm({
   unitId,
   content,
@@ -87,7 +101,8 @@ export function GenerateQuestionSetForm({
         name,
         purposeFilter: selectedPurposes,
         contentIds: selectedContentIds,
-        count,
+        // Only "generate" uses the count; extract and revision decide it from the content.
+        ...(mode === "generate" ? { count } : {}),
         mode,
       }),
     });
@@ -95,7 +110,7 @@ export function GenerateQuestionSetForm({
 
     if (!res.ok) {
       const body = await res.json().catch(() => null);
-      const message = typeof body?.error === "string" ? body.error : FALLBACK_ERRORS[mode];
+      const message = errorMessage(body?.error) ?? FALLBACK_ERRORS[mode];
       setError(message);
       return;
     }
