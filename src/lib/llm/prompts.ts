@@ -196,6 +196,9 @@ ANSWER RULES:
   the points the marking scheme counts, each stated and (where the scheme awards it) explained.
 - Use Markdown: a short lead sentence where helpful, then a bullet or numbered list with one point per
   item, bold key terms. No headings, no HTML.
+- Put every list item on its own line: separate items with a newline ("\n") inside the JSON string,
+  e.g. "1. **Point one** - explanation.\n2. **Point two** - explanation." Never run items together
+  on one line.
 - Use facts, terms and examples from the source. If you must add a widely accepted fact the source
   omits, keep it brief and accurate.
 
