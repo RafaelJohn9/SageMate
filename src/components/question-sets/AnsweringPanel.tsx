@@ -1,5 +1,6 @@
 "use client";
 
+import { Segmented } from "@/components/ui/form";
 import { ScoreMark } from "@/components/ui/ScoreMark";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -181,21 +182,18 @@ export function AnsweringPanel({ questions, setId }: { questions: QuestionData[]
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-2 text-sm">
-        <button
-          type="button"
-          onClick={() => setMode("immediate")}
-          className={`rounded-md px-3 py-1.5 ${mode === "immediate" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
-        >
-          Answer & grade one at a time
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("batch")}
-          className={`rounded-md px-3 py-1.5 ${mode === "batch" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
-        >
-          Answer all, then grade
-        </button>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+        <span className="text-muted-foreground">Grade</span>
+        <Segmented
+          name="grading-mode"
+          label="When to grade your answers"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "immediate", label: "As I go" },
+            { value: "batch", label: "At the end" },
+          ]}
+        />
       </div>
 
       <ol className="flex flex-col gap-3">
