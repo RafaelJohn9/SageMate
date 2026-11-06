@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { buttonPrimary, FormError, inputClass } from "@/components/ui/form";
 
 export function CreateUnitForm() {
   const router = useRouter();
@@ -34,30 +35,39 @@ export function CreateUnitForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
-      <h2 className="text-sm font-semibold text-foreground">New unit</h2>
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Unit name (e.g. Data Structures & Algorithms)"
-        required
-        className="rounded-md border border-border bg-background px-3 py-2 text-sm"
-      />
-      <textarea
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Description (optional)"
-        rows={2}
-        className="rounded-md border border-border bg-background px-3 py-2 text-sm"
-      />
-      {error && <p className="text-sm text-danger">{error}</p>}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-      >
-        {submitting ? "Creating…" : "Create unit"}
-      </button>
+    <form onSubmit={handleSubmit} className="flex max-w-lg flex-col gap-4 border-l-2 border-mark/35 pl-5">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="unit-name" className="text-sm font-medium text-foreground">
+          Unit name
+        </label>
+        <input
+          id="unit-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Data Structures and Algorithms"
+          required
+          className={inputClass}
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="unit-description" className="text-sm font-medium text-foreground">
+          Description <span className="font-normal text-muted-foreground">(optional)</span>
+        </label>
+        <textarea
+          id="unit-description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Course code, lecturer, semester…"
+          rows={2}
+          className={inputClass}
+        />
+      </div>
+      {error && <FormError>{error}</FormError>}
+      <div>
+        <button type="submit" disabled={submitting} className={buttonPrimary}>
+          {submitting ? "Creating…" : "Create unit"}
+        </button>
+      </div>
     </form>
   );
 }

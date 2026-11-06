@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
+import { buttonPrimary, ChipToggle, FormError, FormSection, inputClass } from "@/components/ui/form";
+import { formatCharCount } from "@/lib/formatting";
 import { revisionQuestionCount } from "@/lib/llm/revisionPlan";
 
 type ContentOption = {
@@ -120,128 +122,151 @@ export function GenerateQuestionSetForm({
     router.refresh();
   }
 
+  const busy = submitting !== null;
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Set name (e.g. Unit - CAT 2 Revision - batch 1)"
-        className="rounded-md border border-border bg-background px-3 py-2 text-sm"
-      />
-
-      <div>
-        <p className="mb-2 text-sm font-medium text-foreground">Purpose</p>
-        <div className="flex flex-wrap gap-2">
-          {purposes.length === 0 && <p className="text-sm text-muted-foreground">Add content to this unit first.</p>}
-          {purposes.map((p) => (
-            <button
-              type="button"
-              key={p}
-              onClick={() => togglePurpose(p)}
-              className={`rounded-md px-3 py-1 text-sm ${
-                selectedPurposes.includes(p)
-                  ? "bg-primary text-primary-foreground"
-                  : "border border-border text-muted-foreground"
-              }`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <p className="mb-2 text-sm font-medium text-foreground">Content to draw from</p>
-        <div className="flex flex-col gap-1">
-          {visibleContent.length === 0 && (
-            <p className="text-sm text-muted-foreground">No content matches the selected purpose(s).</p>
-          )}
-          {visibleContent.map((c) => (
-            <label key={c.id} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={selectedContentIds.includes(c.id)}
-                onChange={() => toggleContent(c.id)}
-              />
-              <span>
-                {c.title}{" "}
-                <span className="text-muted-foreground">
-                  ({c.contentKind === "PAST_PAPER" ? "past paper" : "notes"} · {c.purpose})
-                </span>
-              </span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <label className="flex items-center gap-2 text-sm">
-        <span className="text-muted-foreground">Number of questions</span>
+    <form onSubmit={handleSubmit} className="border-t border-border" noValidate>
+      <FormSection title="Name" hint="Something you will recognise later." htmlFor="set-name">
         <input
-          type="number"
-          min={3}
-          max={15}
-          value={count}
-          onChange={(e) => setCount(Number(e.target.value))}
-          className="w-20 rounded-md border border-border bg-background px-2 py-1"
+          id="set-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. CAT 2 revision, batch 1"
+          className={inputClass}
         />
-      </label>
+      </FormSection>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      <FormSection title="Purpose" hint="Which test or exam is this revision for?">
+        {purposes.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Add content to this unit first, then choose a purpose.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {purposes.map((p) => (
+              <ChipToggle key={p} checked={selectedPurposes.includes(p)} onChange={() => togglePurpose(p)}>
+                {p}
+              </ChipToggle>
+            ))}
+          </div>
+        )}
+      </FormSection>
 
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="submit"
-            disabled={submitting !== null}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-          >
-            {submitting === "generate" ? "Generating…" : "Generate questions"}
-          </button>
-          <button
-            type="button"
-            onClick={() => submit("extract")}
-            disabled={submitting !== null}
-            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground disabled:opacity-50"
-          >
-            {submitting === "extract" ? "Extracting…" : "Extract questions only"}
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Already have questions in your notes or past papers? &ldquo;Extract questions only&rdquo; pulls out the
-          questions as written (ignoring the notes and answers) instead of generating new ones. The number of
-          questions setting is ignored.
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-3 rounded-md border border-mark/40 bg-mark-tint p-3">
-        <div>
-          <p className="text-sm font-medium text-foreground">Revision questions with answers</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            A full question bank covering everything you selected, each with a model answer to study from. The
-            more material you select, the more questions you get.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => submit("revision")}
-            disabled={submitting !== null}
-            className="rounded-md bg-mark px-4 py-2 text-sm font-medium text-mark-foreground disabled:opacity-50"
-          >
-            {submitting === "revision" ? `Writing ${revisionCount} questions and answers…` : "Create revision set"}
-          </button>
-          <span className="text-xs text-muted-foreground">
-            {selectedContentIds.length === 0
-              ? "Select content to see how many questions you’ll get."
-              : `About ${revisionCount} questions from your selection`}
-          </span>
-        </div>
-        {submitting === "revision" && revisionCount > 30 && (
-          <p className="text-xs text-muted-foreground">
-            Large selections are written in parts, so this can take a minute or two.
+      <FormSection title="Sources" hint="Tick the notes and past papers to draw from.">
+        {visibleContent.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nothing matches the purposes you chose.</p>
+        ) : (
+          <ul className="border-t border-border">
+            {visibleContent.map((c) => (
+              <li key={c.id} className="border-b border-border">
+                <label className="flex cursor-pointer items-start gap-3 py-2.5 transition-colors hover:bg-card/70">
+                  <input
+                    type="checkbox"
+                    checked={selectedContentIds.includes(c.id)}
+                    onChange={() => toggleContent(c.id)}
+                    className="mt-1 size-4 shrink-0 accent-primary"
+                  />
+                  <span className="min-w-0 text-sm">
+                    <span className="block font-medium text-foreground">{c.title}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {c.contentKind === "PAST_PAPER" ? "Past paper" : "Notes"} · {c.purpose} ·{" "}
+                      {formatCharCount(c.charCount)}
+                    </span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
+        {selectedContentIds.length > 0 && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            {selectedContentIds.length} selected, {formatCharCount(selectedChars)} in total.
           </p>
         )}
-      </div>
+      </FormSection>
+
+      <FormSection title="What to make" hint="Pick one. Each button creates the set straight away.">
+        {error && (
+          <div className="mb-3">
+            <FormError>{error}</FormError>
+          </div>
+        )}
+        <ul className="border-t border-border">
+          <ActionRow
+            title="Write new questions"
+            description="Fresh exam-style questions from your sources, phrased like any past papers you ticked."
+            action={
+              <button type="submit" disabled={busy} className={buttonPrimary}>
+                {submitting === "generate" ? "Generating…" : "Generate questions"}
+              </button>
+            }
+          >
+            <label className="mt-2 flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">How many</span>
+              <input
+                type="number"
+                min={3}
+                max={15}
+                value={count}
+                onChange={(e) => setCount(Number(e.target.value))}
+                className={`${inputClass} w-20! py-1!`}
+              />
+              <span className="text-xs text-muted-foreground">3 to 15</span>
+            </label>
+          </ActionRow>
+
+          <ActionRow
+            title="Pull out existing questions"
+            description="Copies the questions already in your notes or past papers, word for word. The number above does not apply."
+            action={
+              <button type="button" onClick={() => submit("extract")} disabled={busy} className={buttonPrimary}>
+                {submitting === "extract" ? "Extracting…" : "Extract questions"}
+              </button>
+            }
+          />
+
+          <ActionRow
+            title="Build a revision set with answers"
+            description="A question bank covering everything you ticked, each with a model answer to study from. More material means more questions."
+            action={
+              <button type="button" onClick={() => submit("revision")} disabled={busy} className={buttonPrimary}>
+                {submitting === "revision" ? "Writing…" : "Create revision set"}
+              </button>
+            }
+          >
+            <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">
+              {submitting === "revision"
+                ? `Writing ${revisionCount} questions and answers${
+                    revisionCount > 30 ? ". Large selections are written in parts, so this can take a minute or two" : ""
+                  }.`
+                : selectedContentIds.length === 0
+                  ? "Tick some sources to see how many questions you will get."
+                  : `About ${revisionCount} questions from your selection.`}
+            </p>
+          </ActionRow>
+        </ul>
+      </FormSection>
     </form>
+  );
+}
+
+function ActionRow({
+  title,
+  description,
+  action,
+  children,
+}: {
+  title: string;
+  description: string;
+  action: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <li className="flex flex-col gap-3 border-b border-border py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+      <div className="max-w-md">
+        <h3 className="text-sm font-medium text-foreground">{title}</h3>
+        <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+        {children}
+      </div>
+      <div className="shrink-0">{action}</div>
+    </li>
   );
 }
