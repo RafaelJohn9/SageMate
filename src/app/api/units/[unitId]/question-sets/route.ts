@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getLLMProvider } from "@/lib/llm/factory";
-import type { GeneratedQuestion } from "@/lib/llm/types";
+import { runGeneration } from "@/lib/generation";
 import { createQuestionSetSchema } from "@/lib/validation/questionSets";
 
 type RouteParams = { params: Promise<{ unitId: string }> };
@@ -80,56 +80,21 @@ export async function POST(request: Request, { params }: RouteParams) {
 
   const allSourceText = contentItems.map((c) => `## ${c.title}\n${c.rawText}`).join("\n\n");
 
-  try {
-    const generated: (GeneratedQuestion & { answer?: string })[] =
-      mode === "extract"
-        ? await llm.extractQuestions({ unitTitle: unit.name, sourceText: allSourceText })
-        : mode === "revision"
-          ? await llm.generateRevisionQA({
-              unitTitle: unit.name,
-              purpose: purposeFilter.join(","),
-              sourceText: allSourceText,
-            })
-          : await llm.generateQuestions({
-              unitTitle: unit.name,
-              purpose: purposeFilter.join(","),
-              notesText: notesText || "(no notes provided — rely on past paper style and general unit context)",
-              pastPaperText,
-              priorQuestions,
-              count,
-            });
+  // Generation can take minutes (revision sets are written in parts), so it runs after the response:
+  // the client gets the pending set straight away and watches its status.
+  after(() =>
+    runGeneration(llm, {
+      questionSetId: questionSet.id,
+      mode,
+      unitTitle: unit.name,
+      purpose: purposeFilter.join(","),
+      count,
+      notesText,
+      pastPaperText,
+      allSourceText,
+      priorQuestions,
+    }),
+  );
 
-    if (generated.length === 0) {
-      throw new Error(
-        mode === "extract" ? "No questions were found in the selected content" : "LLM returned no questions",
-      );
-    }
-
-    await db.$transaction([
-      db.question.createMany({
-        data: generated.map((q, index) => ({
-          questionSetId: questionSet.id,
-          text: q.text,
-          orderIndex: index,
-          questionType: q.questionType,
-          marks: q.marks,
-          markingScheme: q.markingScheme,
-          answer: q.answer ?? null,
-        })),
-      }),
-      db.questionSet.update({ where: { id: questionSet.id }, data: { status: "COMPLETED" } }),
-    ]);
-  } catch (err) {
-    await db.questionSet.update({ where: { id: questionSet.id }, data: { status: "FAILED" } });
-    return NextResponse.json(
-      { error: `Question generation failed: ${err instanceof Error ? err.message : String(err)}` },
-      { status: 502 },
-    );
-  }
-
-  const result = await db.questionSet.findUnique({
-    where: { id: questionSet.id },
-    include: { questions: { orderBy: { orderIndex: "asc" } } },
-  });
-  return NextResponse.json({ questionSet: result }, { status: 201 });
+  return NextResponse.json({ questionSet }, { status: 202 });
 }

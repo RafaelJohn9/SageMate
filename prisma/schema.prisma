@@ -66,6 +66,7 @@ model QuestionSet {
   purposeFilter String
   kind          QuestionSetKind      @default(PRACTICE)
   status        QuestionSetStatus    @default(PENDING)
+  error         String?
   provider      String
   model         String
   createdAt     DateTime             @default(now())

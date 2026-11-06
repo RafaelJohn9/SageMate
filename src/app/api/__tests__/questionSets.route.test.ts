@@ -3,20 +3,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const db = vi.hoisted(() => ({
   unit: { findUnique: vi.fn() },
   content: { findMany: vi.fn() },
-  question: { findMany: vi.fn(), createMany: vi.fn() },
-  questionSet: { create: vi.fn(), update: vi.fn(), findUnique: vi.fn(), findMany: vi.fn() },
-  $transaction: vi.fn(),
+  question: { findMany: vi.fn() },
+  questionSet: { create: vi.fn(), findMany: vi.fn() },
 }));
-const llm = vi.hoisted(() => ({
-  name: "fake",
-  model: "fake-1",
-  generateQuestions: vi.fn(),
-  extractQuestions: vi.fn(),
-  generateRevisionQA: vi.fn(),
-}));
+const llm = vi.hoisted(() => ({ name: "fake", model: "fake-1" }));
+const runGeneration = vi.hoisted(() => vi.fn());
+// next/server's after() needs a live request; capture its callbacks so tests decide when they run.
+const scheduled = vi.hoisted(() => [] as (() => unknown)[]);
 
 vi.mock("@/lib/db", () => ({ db }));
 vi.mock("@/lib/llm/factory", () => ({ getLLMProvider: () => llm }));
+vi.mock("@/lib/generation", () => ({ runGeneration }));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (callback: () => unknown) => {
+    scheduled.push(callback);
+  },
+}));
 
 import { GET, POST } from "../units/[unitId]/question-sets/route";
 
@@ -26,25 +29,17 @@ const post = (body: unknown) =>
 
 const notes = { id: "c1", unitId: "u1", title: "Lecture 1", contentKind: "NOTES", rawText: "notes body" };
 const paper = { id: "c2", unitId: "u1", title: "CAT 2024", contentKind: "PAST_PAPER", rawText: "paper body" };
-const generated = (extra = {}) => ({
-  text: "What is X?",
-  questionType: "CONCEPTUAL",
-  marks: 3,
-  markingScheme: "3 marks",
-  ...extra,
-});
+const runScheduled = () => Promise.all(scheduled.splice(0).map((callback) => callback()));
 const valid = { name: "Set", purposeFilter: ["CAT1"], contentIds: ["c1"] };
 
 beforeEach(() => {
   vi.resetAllMocks();
+  scheduled.length = 0;
   db.unit.findUnique.mockResolvedValue({ id: "u1", name: "Biology" });
   db.content.findMany.mockResolvedValue([notes]);
   db.question.findMany.mockResolvedValue([]);
-  db.questionSet.create.mockResolvedValue({ id: "s1" });
-  db.questionSet.update.mockResolvedValue({});
-  db.questionSet.findUnique.mockResolvedValue({ id: "s1", questions: [] });
-  db.$transaction.mockImplementation(async (ops: Promise<unknown>[]) => Promise.all(ops));
-  llm.generateQuestions.mockResolvedValue([generated()]);
+  db.questionSet.create.mockResolvedValue({ id: "s1", status: "PENDING" });
+  runGeneration.mockResolvedValue(undefined);
 });
 
 describe("POST /units/:id/question-sets validation", () => {
@@ -67,97 +62,74 @@ describe("POST /units/:id/question-sets validation", () => {
   });
 });
 
-describe("POST generate mode", () => {
-  it("separates notes from past papers and passes prior questions", async () => {
-    db.content.findMany.mockResolvedValue([notes, paper]);
-    db.question.findMany.mockResolvedValue([{ text: "Old question?" }]);
+describe("POST returns before generation finishes", () => {
+  it("responds 202 with the pending set and does not generate inline", async () => {
+    const res = await post(valid);
 
-    const res = await post({ ...valid, contentIds: ["c1", "c2"], count: 8 });
-
-    expect(res.status).toBe(201);
-    expect(llm.generateQuestions).toHaveBeenCalledWith(
-      expect.objectContaining({
-        unitTitle: "Biology",
-        purpose: "CAT1",
-        count: 8,
-        notesText: "## Lecture 1\nnotes body",
-        pastPaperText: "## CAT 2024\npaper body",
-        priorQuestions: ["Old question?"],
-      }),
-    );
+    expect(res.status).toBe(202);
+    expect((await res.json()).questionSet).toMatchObject({ id: "s1", status: "PENDING" });
     expect(db.questionSet.create.mock.calls[0][0].data).toMatchObject({
       kind: "PRACTICE",
       status: "PENDING",
       provider: "fake",
+      model: "fake-1",
       purposeFilter: "CAT1",
+    });
+    expect(runGeneration).not.toHaveBeenCalled();
+    expect(scheduled).toHaveLength(1);
+  });
+
+  it("hands the job to runGeneration once the response is done", async () => {
+    await post(valid);
+    await runScheduled();
+
+    expect(runGeneration).toHaveBeenCalledTimes(1);
+    expect(runGeneration).toHaveBeenCalledWith(llm, expect.objectContaining({ questionSetId: "s1", mode: "generate" }));
+  });
+});
+
+describe("POST job contents", () => {
+  it("separates notes from past papers and includes prior questions in generate mode", async () => {
+    db.content.findMany.mockResolvedValue([notes, paper]);
+    db.question.findMany.mockResolvedValue([{ text: "Old question?" }]);
+
+    await post({ ...valid, contentIds: ["c1", "c2"], count: 8 });
+    await runScheduled();
+
+    expect(runGeneration.mock.calls[0][1]).toEqual({
+      questionSetId: "s1",
+      mode: "generate",
+      unitTitle: "Biology",
+      purpose: "CAT1",
+      count: 8,
+      notesText: "## Lecture 1\nnotes body",
+      pastPaperText: "## CAT 2024\npaper body",
+      allSourceText: "## Lecture 1\nnotes body\n\n## CAT 2024\npaper body",
+      priorQuestions: ["Old question?"],
     });
   });
 
   it("omits past papers when only notes are selected", async () => {
     await post(valid);
-    expect(llm.generateQuestions.mock.calls[0][0].pastPaperText).toBeUndefined();
+    await runScheduled();
+    expect(runGeneration.mock.calls[0][1].pastPaperText).toBeUndefined();
   });
 
-  it("saves questions in order and marks the set completed", async () => {
-    llm.generateQuestions.mockResolvedValue([generated({ text: "A?" }), generated({ text: "B?" })]);
-    await post(valid);
+  it("extract skips the prior-question lookup and stays a practice set", async () => {
+    await post({ ...valid, mode: "extract" });
+    await runScheduled();
 
-    const rows = db.question.createMany.mock.calls[0][0].data;
-    expect(rows.map((r: { text: string; orderIndex: number }) => [r.text, r.orderIndex])).toEqual([
-      ["A?", 0],
-      ["B?", 1],
-    ]);
-    expect(db.questionSet.update).toHaveBeenCalledWith({ where: { id: "s1" }, data: { status: "COMPLETED" } });
-  });
-});
-
-describe("POST extract and revision modes", () => {
-  it("extract uses all source text and skips prior-question lookup", async () => {
-    db.content.findMany.mockResolvedValue([notes, paper]);
-    llm.extractQuestions.mockResolvedValue([generated()]);
-
-    const res = await post({ ...valid, contentIds: ["c1", "c2"], mode: "extract" });
-
-    expect(res.status).toBe(201);
-    expect(llm.extractQuestions).toHaveBeenCalledWith({
-      unitTitle: "Biology",
-      sourceText: "## Lecture 1\nnotes body\n\n## CAT 2024\npaper body",
-    });
     expect(db.question.findMany).not.toHaveBeenCalled();
     expect(db.questionSet.create.mock.calls[0][0].data.kind).toBe("PRACTICE");
+    expect(runGeneration.mock.calls[0][1].mode).toBe("extract");
   });
 
-  it("revision creates a REVISION set and stores model answers", async () => {
-    llm.generateRevisionQA.mockResolvedValue([generated({ answer: "Model answer" })]);
+  it("revision creates a REVISION set", async () => {
+    await post({ ...valid, mode: "revision" });
+    await runScheduled();
 
-    const res = await post({ ...valid, mode: "revision" });
-
-    expect(res.status).toBe(201);
     expect(db.questionSet.create.mock.calls[0][0].data.kind).toBe("REVISION");
-    expect(db.question.createMany.mock.calls[0][0].data[0].answer).toBe("Model answer");
-  });
-});
-
-describe("POST failure handling", () => {
-  it("marks the set FAILED and returns 502 when the LLM throws", async () => {
-    llm.generateQuestions.mockRejectedValue(new Error("rate limited"));
-
-    const res = await post(valid);
-
-    expect(res.status).toBe(502);
-    expect((await res.json()).error).toContain("rate limited");
-    expect(db.questionSet.update).toHaveBeenCalledWith({ where: { id: "s1" }, data: { status: "FAILED" } });
-    expect(db.question.createMany).not.toHaveBeenCalled();
-  });
-
-  it("treats an empty result as a failure with a mode-specific message", async () => {
-    llm.extractQuestions.mockResolvedValue([]);
-
-    const res = await post({ ...valid, mode: "extract" });
-
-    expect(res.status).toBe(502);
-    expect((await res.json()).error).toContain("No questions were found");
-    expect(db.questionSet.update).toHaveBeenCalledWith({ where: { id: "s1" }, data: { status: "FAILED" } });
+    expect(runGeneration.mock.calls[0][1].mode).toBe("revision");
   });
 });
 

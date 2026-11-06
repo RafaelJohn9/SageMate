@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { AnsweringPanel } from "@/components/question-sets/AnsweringPanel";
 import { RevisionPanel } from "@/components/question-sets/RevisionPanel";
+import { GenerationStatus } from "@/components/question-sets/GenerationStatus";
 import { formatRelativeTime } from "@/lib/formatRelativeTime";
+import { effectiveStatus, INTERRUPTED_MESSAGE } from "@/lib/questionSetStatus";
 
 export default async function QuestionSetDetailPage({
   params,
@@ -48,6 +50,8 @@ export default async function QuestionSetDetailPage({
   }));
 
   const isRevision = questionSet.kind === "REVISION";
+  const status = effectiveStatus(questionSet.status, questionSet.createdAt);
+  const ready = status === "COMPLETED";
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-12">
@@ -57,9 +61,10 @@ export default async function QuestionSetDetailPage({
         </Link>
         <h1 className="font-display tracking-tight text-2xl font-semibold text-foreground">{questionSet.name}</h1>
         <p className="text-xs text-muted-foreground">
-          {isRevision ? `Revision set of ${questionSet.questions.length} · ` : ""}Generated {formatRelativeTime(questionSet.createdAt)} · {questionSet.status.toLowerCase()} · purpose:{" "}
+          {isRevision && ready ? `Revision set of ${questionSet.questions.length} · ` : ""}Generated {formatRelativeTime(questionSet.createdAt)} · {status.toLowerCase()} · purpose:{" "}
           {questionSet.purposeFilter} · {questionSet.provider}/{questionSet.model}
         </p>
+        {ready && (
         <div className="mt-2 flex flex-wrap gap-3 text-xs">
           {isRevision && (
             <a
@@ -88,9 +93,17 @@ export default async function QuestionSetDetailPage({
             Export: questions + answers + corrections (PDF)
           </a>
         </div>
+        )}
       </header>
 
-      {isRevision ? (
+      {!ready ? (
+        <GenerationStatus
+          status={status === "FAILED" ? "FAILED" : "PENDING"}
+          error={questionSet.status === "FAILED" ? questionSet.error : INTERRUPTED_MESSAGE}
+          isRevision={isRevision}
+          retryHref={`/units/${questionSet.unitId}/question-sets/new`}
+        />
+      ) : isRevision ? (
         <RevisionPanel setId={questionSet.id} questions={questionsWithLatest} />
       ) : (
         <AnsweringPanel setId={questionSet.id} questions={questionsWithLatest} />

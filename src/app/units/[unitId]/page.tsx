@@ -5,6 +5,7 @@ import { DeleteContentButton } from "@/components/content/DeleteContentButton";
 import { RenameUnitForm } from "@/components/units/RenameUnitForm";
 import { ScoreMark } from "@/components/ui/ScoreMark";
 import { formatRelativeTime } from "@/lib/formatRelativeTime";
+import { effectiveStatus } from "@/lib/questionSetStatus";
 import { summarizeUnit } from "@/lib/unitStats";
 
 export default async function UnitDetailPage({
@@ -97,7 +98,8 @@ export default async function UnitDetailPage({
             {unit.questionSets.map((qs) => {
               const isRevision = qs.kind === "REVISION";
               const progress = summarizeUnit([qs]);
-              const failed = qs.status === "FAILED";
+              const status = effectiveStatus(qs.status, qs.createdAt);
+              const failed = status === "FAILED";
               return (
                 <li
                   key={qs.id}
@@ -114,9 +116,9 @@ export default async function UnitDetailPage({
                       {isRevision && (
                         <span className="rounded-full bg-mark-tint px-2 py-0.5 text-xs text-mark">Revision Q&amp;A</span>
                       )}
-                      {qs.status !== "COMPLETED" && (
+                      {status !== "COMPLETED" && (
                         <span className={`text-xs ${failed ? "text-danger" : "text-muted-foreground"}`}>
-                          {qs.status === "PENDING" ? "Generating…" : "Generation failed"}
+                          {status === "PENDING" ? "Generating…" : "Generation failed"}
                         </span>
                       )}
                     </div>
