@@ -23,3 +23,10 @@ export function splitInlineNumberedList(text: string): string {
     })
     .join("\n");
 }
+
+// "850 characters", "4.2k characters", "36k characters": a rough size for a piece of source material.
+export function formatCharCount(count: number): string {
+  if (count < 1000) return `${count} characters`;
+  const thousands = count / 1000;
+  return `${thousands < 10 ? thousands.toFixed(1) : Math.round(thousands)}k characters`;
+}

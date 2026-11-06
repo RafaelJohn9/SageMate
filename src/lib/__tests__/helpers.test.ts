@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { sanitizeForPdf } from "../pdf/sanitize";
-import { splitInlineNumberedList } from "../formatting";
+import { formatCharCount, splitInlineNumberedList } from "../formatting";
 import { withTimeout } from "../withTimeout";
 import { formatRelativeTime } from "../formatRelativeTime";
 
@@ -46,5 +46,13 @@ describe("formatRelativeTime", () => {
   it("formats past dates", () => {
     expect(formatRelativeTime(new Date(Date.now() - 3 * 3600 * 1000))).toBe("3 hours ago");
     expect(formatRelativeTime(new Date(Date.now() - 2 * 86400 * 1000))).toBe("2 days ago");
+  });
+});
+
+describe("formatCharCount", () => {
+  it("formats small, medium and large sizes", () => {
+    expect(formatCharCount(850)).toBe("850 characters");
+    expect(formatCharCount(4200)).toBe("4.2k characters");
+    expect(formatCharCount(36_000)).toBe("36k characters");
   });
 });

@@ -1,7 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, type DragEvent, type FormEvent } from "react";
+import { useState, type DragEvent, type FormEvent } from "react";
+import {
+  buttonPrimary,
+  FormError,
+  FormSection,
+  inputClass,
+  Segmented,
+} from "@/components/ui/form";
+import { formatCharCount } from "@/lib/formatting";
 
 const PURPOSE_PRESETS = ["GENERAL", "CAT1", "CAT2", "EXAM"];
 
@@ -13,7 +21,6 @@ type PendingFile = { file: File; title: string };
 
 export function AddContentForm({ unitId }: { unitId: string }) {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<"paste" | "upload">("paste");
   const [title, setTitle] = useState("");
   const [contentKind, setContentKind] = useState<"NOTES" | "PAST_PAPER">("NOTES");
@@ -44,7 +51,7 @@ export function AddContentForm({ unitId }: { unitId: string }) {
     setPendingFiles((prev) => prev.map((p, i) => (i === index ? { ...p, title: newTitle } : p)));
   }
 
-  function handleDrop(event: DragEvent<HTMLDivElement>) {
+  function handleDrop(event: DragEvent<HTMLElement>) {
     event.preventDefault();
     setDragActive(false);
     addFiles(event.dataTransfer.files);
@@ -146,166 +153,176 @@ export function AddContentForm({ unitId }: { unitId: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
-      <div className="flex gap-2 text-sm">
-        <button
-          type="button"
-          onClick={() => setMode("paste")}
-          className={`rounded-md px-3 py-1.5 transition-colors ${mode === "paste" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
-        >
-          Paste text
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("upload")}
-          className={`rounded-md px-3 py-1.5 transition-colors ${mode === "upload" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}
-        >
-          Upload PDF/DOCX
-        </button>
-      </div>
+    <form onSubmit={handleSubmit} className="border-t border-border" noValidate>
+      <FormSection title="Add it by" hint="Paste text straight in, or upload PDF and Word files.">
+        <Segmented
+          name="mode"
+          label="How to add content"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "paste", label: "Pasting text" },
+            { value: "upload", label: "Uploading files" },
+          ]}
+        />
+      </FormSection>
 
       {mode === "paste" && (
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Title (e.g. Lecture 3 notes, CAT 1 2025 paper)"
-          className="rounded-md border border-border bg-background px-3 py-2 text-sm"
-        />
+        <FormSection title="Title" htmlFor="content-title">
+          <input
+            id="content-title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Lecture 3 notes, CAT 1 2025 paper"
+            className={inputClass}
+          />
+        </FormSection>
       )}
 
-      <div className="flex flex-wrap gap-4 text-sm">
-        <label className="flex items-center gap-2">
-          <span className="text-muted-foreground">Kind</span>
-          <select
-            value={contentKind}
-            onChange={(e) => setContentKind(e.target.value as "NOTES" | "PAST_PAPER")}
-            className="rounded-md border border-border bg-background px-2 py-1"
-          >
-            <option value="NOTES">Notes / assignment</option>
-            <option value="PAST_PAPER">Past CAT/exam paper</option>
-          </select>
-        </label>
-
-        <label className="flex items-center gap-2">
-          <span className="text-muted-foreground">Purpose</span>
-          <select
-            value={purpose}
-            onChange={(e) => setPurpose(e.target.value)}
-            className="rounded-md border border-border bg-background px-2 py-1"
-          >
-            {PURPOSE_PRESETS.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-            <option value="CUSTOM">Custom…</option>
-          </select>
-        </label>
-
-        {purpose === "CUSTOM" && (
-          <input
-            value={customPurpose}
-            onChange={(e) => setCustomPurpose(e.target.value)}
-            placeholder="e.g. CAT3"
-            className="rounded-md border border-border bg-background px-2 py-1 text-sm"
-          />
-        )}
-      </div>
-
-      {mode === "paste" ? (
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Paste notes, assignment, or past paper text here…"
-          rows={10}
-          className="rounded-md border border-border bg-background px-3 py-2 font-mono text-xs"
+      <FormSection
+        title="Kind"
+        hint="Past papers teach SageMate how your lecturer phrases questions. Notes are the material to learn."
+      >
+        <Segmented
+          name="kind"
+          label="Kind of content"
+          value={contentKind}
+          onChange={setContentKind}
+          options={[
+            { value: "NOTES", label: "Notes or assignment" },
+            { value: "PAST_PAPER", label: "Past CAT or exam paper" },
+          ]}
         />
-      ) : (
-        <div className="flex flex-col gap-3">
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragActive(true);
-            }}
-            onDragLeave={() => setDragActive(false)}
-            onDrop={handleDrop}
-            className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors ${
-              dragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
-            }`}
-          >
-            <svg
-              width="28"
-              height="28"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              className="text-muted-foreground"
-            >
-              <path d="M12 16V4m0 0L7 9m5-5l5 5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <p className="text-sm">
-              <span className="font-medium text-primary">Click to browse</span>{" "}
-              <span className="text-muted-foreground">or drag PDF/DOCX files here</span>
-            </p>
-            <p className="text-xs text-muted-foreground">Kind and purpose above apply to all selected files.</p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              onChange={(e) => {
-                addFiles(e.target.files);
-                e.target.value = "";
-              }}
-              className="hidden"
-            />
-          </div>
+      </FormSection>
 
-          {pendingFiles.length > 0 && (
-            <ul className="flex flex-col gap-2">
-              {pendingFiles.map((p, i) => (
-                <li key={i} className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5">
-                  <input
-                    value={p.title}
-                    onChange={(e) => renamePendingFile(i, e.target.value)}
-                    className="flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm focus:border-border focus:outline-none"
-                  />
-                  <span className="text-xs text-muted-foreground">{p.file.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => removePendingFile(i)}
-                    className="text-xs text-danger hover:underline"
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
+      <FormSection title="Purpose" hint="Which test is this for? You can filter by it when generating questions.">
+        <div className="flex flex-col gap-3">
+          <Segmented
+            name="purpose"
+            label="Purpose"
+            value={purpose}
+            onChange={setPurpose}
+            options={[
+              ...PURPOSE_PRESETS.map((p) => ({ value: p, label: p })),
+              { value: "CUSTOM", label: "Something else" },
+            ]}
+          />
+          {purpose === "CUSTOM" && (
+            <input
+              value={customPurpose}
+              onChange={(e) => setCustomPurpose(e.target.value)}
+              placeholder="e.g. CAT3"
+              aria-label="Custom purpose"
+              className={`${inputClass} sm:w-56`}
+            />
           )}
         </div>
-      )}
+      </FormSection>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
-      {progress && (
-        <p className="text-sm text-muted-foreground">
-          Uploading {progress.done}/{progress.total}…
-        </p>
-      )}
-
-      <button
-        type="submit"
-        disabled={submitting}
-        className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-50"
+      <FormSection
+        title={mode === "paste" ? "Text" : "Files"}
+        htmlFor={mode === "paste" ? "content-text" : undefined}
+        hint={mode === "upload" ? "Kind and purpose apply to every file you add." : undefined}
       >
-        {submitting
-          ? "Adding…"
-          : mode === "upload" && pendingFiles.length > 1
-            ? `Add ${pendingFiles.length} files`
-            : "Add content"}
-      </button>
+        {mode === "paste" ? (
+          <div className="flex flex-col gap-1.5">
+            <textarea
+              id="content-text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Paste your notes, assignment or past paper here…"
+              rows={12}
+              className={`${inputClass} leading-relaxed`}
+            />
+            <p className="text-xs text-muted-foreground">
+              {text.trim() ? formatCharCount(text.trim().length) : "Nothing pasted yet."}
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <label
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragActive(true);
+              }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={handleDrop}
+              className={`flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed px-6 py-9 text-center transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30 ${
+                dragActive ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/60"
+              }`}
+            >
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                aria-hidden
+                className="text-muted-foreground"
+              >
+                <path d="M12 16V4m0 0L7 9m5-5l5 5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="text-sm">
+                <span className="font-medium text-primary">Choose files</span>{" "}
+                <span className="text-muted-foreground">or drop PDF and Word files here</span>
+              </span>
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+                className="sr-only"
+              />
+            </label>
+
+            {pendingFiles.length > 0 && (
+              <ul className="border-t border-border">
+                {pendingFiles.map((p, i) => (
+                  <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border py-2">
+                    <input
+                      value={p.title}
+                      onChange={(e) => renamePendingFile(i, e.target.value)}
+                      aria-label={`Title for ${p.file.name}`}
+                      className="min-w-0 flex-1 basis-48 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm hover:border-border"
+                    />
+                    <span className="max-w-48 truncate text-xs text-muted-foreground">{p.file.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removePendingFile(i)}
+                      className="text-xs text-danger hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </FormSection>
+
+      <div className="flex flex-col gap-3 py-5">
+        {error && <FormError>{error}</FormError>}
+        {progress && (
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            Uploading {progress.done} of {progress.total}…
+          </p>
+        )}
+        <div>
+          <button type="submit" disabled={submitting} className={buttonPrimary}>
+            {submitting
+              ? "Adding…"
+              : mode === "upload" && pendingFiles.length > 1
+                ? `Add ${pendingFiles.length} files`
+                : "Add content"}
+          </button>
+        </div>
+      </div>
     </form>
   );
 }
