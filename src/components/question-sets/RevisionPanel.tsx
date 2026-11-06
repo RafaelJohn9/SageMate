@@ -200,7 +200,7 @@ export function RevisionPanel({ setId, questions }: { setId: string; questions: 
                       {q.marks != null && <span className="text-xs text-muted-foreground">{q.marks} marks</span>}
                       <span className="ml-auto text-xs text-primary">{isOpen ? "Hide answer" : "Show answer"}</span>
                     </span>
-                    <span className="font-serif text-base leading-relaxed break-words text-foreground">{q.text}</span>
+                    <span className="text-base leading-relaxed break-words text-foreground">{q.text}</span>
                   </button>
 
                   <div

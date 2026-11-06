@@ -67,7 +67,7 @@ export function DiscussionPanel({ gradingId }: { gradingId: string }) {
   }
 
   return (
-    <div className="mt-3 border-t border-success/30 pt-3">
+    <div className="mt-3 border-t border-border pt-3">
       <button
         type="button"
         onClick={toggle}

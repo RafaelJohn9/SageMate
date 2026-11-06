@@ -1,5 +1,6 @@
 "use client";
 
+import { ScoreMark } from "@/components/ui/ScoreMark";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Markdown } from "@/components/ui/Markdown";
@@ -28,6 +29,12 @@ function formatScore(result: GradingResult, marks: number | null): string {
     return `${result.marksAwarded}/${marks} marks`;
   }
   return `${result.score}/100`;
+}
+
+// Short form for the circled mark: "3/5" or "72%".
+function markText(result: GradingResult, marks: number | null): string {
+  if (result.marksAwarded != null && marks != null) return `${result.marksAwarded}/${marks}`;
+  return `${Math.round(result.score)}%`;
 }
 
 type HistoryAttempt = {
@@ -251,24 +258,28 @@ export function AnsweringPanel({ questions, setId }: { questions: QuestionData[]
                 </div>
               )}
               {result && (
-                <div className="mt-3 rounded-md border border-success/30 bg-success-tint p-3 text-sm">
-                  <p className="font-medium text-success">Score: {formatScore(result, q.marks)}</p>
-                  <div className="mt-1 text-foreground">
+                <div className="mt-4 flex flex-col gap-3 rounded-md border border-border bg-background p-4 text-sm sm:flex-row sm:gap-5">
+                  <div className="sm:pt-1">
+                    <ScoreMark value={markText(result, q.marks)} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                  <div className="text-foreground">
                     <Markdown>{result.feedback}</Markdown>
                   </div>
                   {result.modelAnswer && (
-                    <div className="mt-2 text-muted-foreground">
+                    <div className="mt-3 border-l-2 border-primary pl-3 text-muted-foreground">
                       <span className="font-medium text-foreground">Model answer: </span>
                       <Markdown>{result.modelAnswer}</Markdown>
                     </div>
                   )}
                   {q.markingScheme && (
-                    <p className="mt-2 text-muted-foreground">
-                      <span className="font-medium">Marking scheme: </span>
+                    <p className="mt-3 text-muted-foreground">
+                      <span className="font-medium text-foreground">Marking scheme: </span>
                       {q.markingScheme}
                     </p>
                   )}
                   <DiscussionPanel key={result.id} gradingId={result.id} />
+                  </div>
                 </div>
               )}
               {gradingError && <p className="mt-2 text-xs text-danger">{gradingError}</p>}

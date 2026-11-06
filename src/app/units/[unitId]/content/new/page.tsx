@@ -20,7 +20,7 @@ export default async function NewContentPage({
         <Link href={`/units/${unitId}`} className="text-sm text-muted-foreground hover:underline">
           ← {unit.name}
         </Link>
-        <h1 className="font-serif text-2xl font-semibold text-foreground">Add content</h1>
+        <h1 className="font-display tracking-tight text-2xl font-semibold text-foreground">Add content</h1>
       </header>
       <AddContentForm unitId={unitId} />
     </div>
