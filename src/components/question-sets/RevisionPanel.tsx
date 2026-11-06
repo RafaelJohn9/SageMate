@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore, type ComponentProps } from "react";
+import { Segmented } from "@/components/ui/form";
 import { Markdown } from "@/components/ui/Markdown";
 import { AnsweringPanel } from "./AnsweringPanel";
 
@@ -91,26 +92,17 @@ export function RevisionPanel({ setId, questions }: { setId: string; questions: 
 
   return (
     <div className="flex flex-col gap-4">
-      <div role="tablist" aria-label="Revision mode" className="flex flex-wrap gap-2 text-sm">
-        {(
-          [
-            ["study", "Study with answers"],
-            ["test", "Test yourself"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            aria-selected={view === value}
-            onClick={() => setView(value)}
-            className={`rounded-md px-3 py-1.5 ${focusRing} ${
-              view === value ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+      <div>
+        <Segmented
+          name="revision-view"
+          label="Revision mode"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "study", label: "Study with answers" },
+            { value: "test", label: "Test yourself" },
+          ]}
+        />
       </div>
 
       {view === "test" ? (
