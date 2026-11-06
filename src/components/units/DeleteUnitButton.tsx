@@ -20,7 +20,7 @@ export function DeleteUnitButton({ unitId }: { unitId: string }) {
     <button
       onClick={handleDelete}
       disabled={deleting}
-      className="text-sm text-danger hover:underline disabled:opacity-50"
+      className="text-xs text-danger hover:underline disabled:opacity-50"
     >
       {deleting ? "Deleting…" : "Delete"}
     </button>
