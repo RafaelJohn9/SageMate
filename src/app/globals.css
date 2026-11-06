@@ -133,6 +133,26 @@ button:not(.bg-primary):not(:disabled):hover {
   border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
 }
 
+/* Waiting state while a question set is being written: a highlighter stroke sweeping along a line. */
+.writing-bar > span {
+  animation: writing-sweep 1.4s ease-in-out infinite;
+}
+@keyframes writing-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .writing-bar > span {
+    animation: none;
+    width: 100%;
+    opacity: 0.6;
+  }
+}
+
 /* A grade, written the way a teacher writes it: red pen, circled, slightly off-level. */
 .pen-mark {
   display: inline-flex;
