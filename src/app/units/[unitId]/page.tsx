@@ -34,7 +34,7 @@ export default async function UnitDetailPage({
         <Link href="/" className="text-sm text-muted-foreground hover:underline">
           ← All units
         </Link>
-        <h1 className="font-serif text-2xl font-semibold text-foreground">{unit.name}</h1>
+        <h1 className="font-display tracking-tight text-2xl font-semibold text-foreground">{unit.name}</h1>
         {unit.description && <p className="text-sm text-muted-foreground">{unit.description}</p>}
         <RenameUnitForm unitId={unit.id} initialName={unit.name} initialDescription={unit.description} />
       </header>

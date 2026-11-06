@@ -9,8 +9,12 @@ export async function Sidebar() {
   });
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col gap-4 border-r border-border px-3 py-6">
-      <Link href="/" className="px-2 font-serif text-xl font-semibold text-foreground">
+    // The red rule down the edge is the margin line of an exercise book.
+    <aside className="flex w-full shrink-0 flex-col gap-3 border-b-2 border-mark/45 bg-card px-3 py-4 md:sticky md:top-0 md:h-screen md:w-60 md:gap-5 md:overflow-y-auto md:border-r-2 md:border-b-0 md:py-6">
+      <Link
+        href="/"
+        className="px-2 font-display text-2xl font-bold tracking-tight text-foreground"
+      >
         SageMate
       </Link>
       <SidebarNav units={units} />

@@ -1,24 +1,31 @@
 @import "tailwindcss";
 
+/*
+ * Palette: an exercise book. Cool ruled paper, ballpoint-blue ink for the student,
+ * and a teacher's red pen reserved for marks. Yellow is the highlighter.
+ */
 :root {
-  --background: #f7f6f2;
-  --foreground: #1f2a44;
-  --muted-foreground: #5b6472;
-  --border: #dcd9d0;
-  --card: #ffffff;
+  --background: #eff2f6;
+  --foreground: #15202f;
+  --muted-foreground: #54627a;
+  --border: #c8d5e6;
+  --card: #fbfcfe;
 
-  --primary: #3b5ba5;
+  --primary: #2342c7;
   --primary-foreground: #ffffff;
 
-  --mark: #b8722e;
+  --mark: #c8372a;
   --mark-foreground: #ffffff;
-  --mark-tint: #f3e6d6;
+  --mark-tint: #fbe4e0;
 
-  --success: #3f7a5c;
+  --success: #17784c;
   --success-foreground: #ffffff;
-  --success-tint: #e2ede7;
+  --success-tint: #dff1e8;
 
-  --danger: #a3372c;
+  --danger: #b3261e;
+
+  --highlight: #ffe66d;
+  --highlight-foreground: #2a2400;
 }
 
 @theme inline {
@@ -41,30 +48,41 @@
 
   --color-danger: var(--danger);
 
-  --font-sans: var(--font-plex-sans);
-  --font-serif: var(--font-source-serif);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+
+  --font-sans: var(--font-instrument-sans);
+  --font-display: var(--font-bricolage);
+  --font-hand: var(--font-caveat);
+
+  /* Stationery has crisp corners: tighter radii than the Tailwind defaults. */
+  --radius-md: 4px;
+  --radius-lg: 6px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #14171c;
-    --foreground: #eceae4;
-    --muted-foreground: #98a0ad;
-    --border: #2b303a;
-    --card: #1b1f26;
+    --background: #0f1621;
+    --foreground: #e8ecf3;
+    --muted-foreground: #98a6bd;
+    --border: #26344a;
+    --card: #16202e;
 
-    --primary: #7d9fdb;
-    --primary-foreground: #10182c;
+    --primary: #8ea4ff;
+    --primary-foreground: #0b1233;
 
-    --mark: #d9975a;
-    --mark-foreground: #241605;
-    --mark-tint: #2e2418;
+    --mark: #ff7d6e;
+    --mark-foreground: #2b0804;
+    --mark-tint: #3a1a17;
 
-    --success: #6fb897;
-    --success-foreground: #0c2018;
-    --success-tint: #16241d;
+    --success: #5fc496;
+    --success-foreground: #072216;
+    --success-tint: #12261d;
 
-    --danger: #e08b7d;
+    --danger: #ff8a80;
+
+    --highlight: #5c5110;
+    --highlight-foreground: #fff6c2;
   }
 }
 
@@ -72,6 +90,81 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+::selection {
+  background: var(--highlight);
+  color: var(--highlight-foreground);
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+input,
+textarea,
+select {
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+input::placeholder,
+textarea::placeholder {
+  color: color-mix(in srgb, var(--muted-foreground) 75%, transparent);
+}
+
+button {
+  transition: filter 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+button:not(:disabled) {
+  cursor: pointer;
+}
+button.bg-primary:not(:disabled):hover {
+  filter: brightness(1.12);
+}
+button:not(.bg-primary):not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+}
+
+/* A grade, written the way a teacher writes it: red pen, circled, slightly off-level. */
+.pen-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 4.5rem;
+  padding: 0.35rem 0.9rem 0.45rem;
+  border: 2.5px solid var(--mark);
+  border-radius: 58% 42% 54% 46% / 52% 58% 42% 48%;
+  color: var(--mark);
+  font-family: var(--font-hand), cursive;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  transform: rotate(-5deg);
+  animation: pen-stamp 380ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+@keyframes pen-stamp {
+  from {
+    opacity: 0;
+    transform: rotate(-12deg) scale(1.6);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-5deg) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pen-mark {
+    animation: none;
+  }
 }
 
 .md-content > :first-child {

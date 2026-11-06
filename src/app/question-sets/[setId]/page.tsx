@@ -55,7 +55,7 @@ export default async function QuestionSetDetailPage({
         <Link href={`/units/${questionSet.unitId}`} className="text-sm text-muted-foreground hover:underline">
           ← {questionSet.unit.name}
         </Link>
-        <h1 className="font-serif text-2xl font-semibold text-foreground">{questionSet.name}</h1>
+        <h1 className="font-display tracking-tight text-2xl font-semibold text-foreground">{questionSet.name}</h1>
         <p className="text-xs text-muted-foreground">
           {isRevision ? `Revision set of ${questionSet.questions.length} · ` : ""}Generated {formatRelativeTime(questionSet.createdAt)} · {questionSet.status.toLowerCase()} · purpose:{" "}
           {questionSet.purposeFilter} · {questionSet.provider}/{questionSet.model}

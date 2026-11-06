@@ -12,7 +12,7 @@ export default async function Home() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-12">
       <header>
-        <h1 className="font-serif text-3xl font-semibold text-foreground">SageMate</h1>
+        <h1 className="font-display tracking-tight text-3xl font-semibold text-foreground">SageMate</h1>
         <p className="text-sm text-muted-foreground">
           Organize notes by unit, generate revision questions, and grade your own answers.
         </p>

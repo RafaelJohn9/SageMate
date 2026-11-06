@@ -23,7 +23,7 @@ export default async function NewQuestionSetPage({
         <Link href={`/units/${unitId}`} className="text-sm text-muted-foreground hover:underline">
           ← {unit.name}
         </Link>
-        <h1 className="font-serif text-2xl font-semibold text-foreground">Generate revision questions</h1>
+        <h1 className="font-display tracking-tight text-2xl font-semibold text-foreground">Generate revision questions</h1>
       </header>
       <GenerateQuestionSetForm
         unitId={unitId}
