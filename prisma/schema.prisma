@@ -43,6 +43,8 @@ model Content {
   purpose          String               @default("GENERAL")
   rawText          String
   originalFilename String?
+  // Chapters/sections as [{ title, level, start }] (start = offset into rawText); see src/lib/outline.ts.
+  outline          Json?
   createdAt        DateTime             @default(now())
   questionSets     QuestionSetContent[]
 }
@@ -79,6 +81,10 @@ model QuestionSetContent {
   contentId     String
   questionSet   QuestionSet @relation(fields: [questionSetId], references: [id], onDelete: Cascade)
   content       Content     @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  // When the set covers only part of the content (e.g. chapters 1-5): the rawText slice and its name.
+  rangeStart    Int?
+  rangeEnd      Int?
+  rangeLabel    String?
 
   @@id([questionSetId, contentId])
 }

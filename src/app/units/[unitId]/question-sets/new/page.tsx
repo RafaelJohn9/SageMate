@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { resolveOutline } from "@/lib/outline";
 import { GenerateQuestionSetForm } from "@/components/question-sets/GenerateQuestionSetForm";
 
 export default async function NewQuestionSetPage({
@@ -33,6 +34,7 @@ export default async function NewQuestionSetPage({
           purpose: c.purpose,
           contentKind: c.contentKind,
           charCount: c.rawText.length,
+          outline: resolveOutline(c.outline, c.rawText),
         }))}
       />
     </div>

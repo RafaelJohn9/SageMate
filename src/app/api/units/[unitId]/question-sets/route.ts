@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getLLMProvider } from "@/lib/llm/factory";
 import { runGeneration } from "@/lib/generation";
 import { createQuestionSetSchema } from "@/lib/validation/questionSets";
+import { formatSource, resolveContentRange } from "@/lib/questionSets";
 
 type RouteParams = { params: Promise<{ unitId: string }> };
 
@@ -29,7 +30,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { name, purposeFilter, contentIds, count, mode } = parsed.data;
+  const { name, purposeFilter, contentIds, count, mode, ranges } = parsed.data;
 
   const contentItems = await db.content.findMany({
     where: { id: { in: contentIds }, unitId },
@@ -38,15 +39,25 @@ export async function POST(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "No matching content found for this unit" }, { status: 400 });
   }
 
-  const notesText = contentItems
-    .filter((c) => c.contentKind === "NOTES")
-    .map((c) => `## ${c.title}\n${c.rawText}`)
+  // Narrow each source to the chapters the student picked, e.g. "everything up to Chapter 5".
+  const sources = [];
+  for (const content of contentItems) {
+    try {
+      const range = resolveContentRange(content, ranges[content.id]);
+      sources.push({ content, range, text: formatSource(content, range) });
+    } catch (err) {
+      if (err instanceof RangeError) return NextResponse.json({ error: err.message }, { status: 400 });
+      throw err;
+    }
+  }
+
+  const notesText = sources
+    .filter((s) => s.content.contentKind === "NOTES")
+    .map((s) => s.text)
     .join("\n\n");
-  const pastPaperItems = contentItems.filter((c) => c.contentKind === "PAST_PAPER");
+  const pastPaperSources = sources.filter((s) => s.content.contentKind === "PAST_PAPER");
   const pastPaperText =
-    pastPaperItems.length > 0
-      ? pastPaperItems.map((c) => `## ${c.title}\n${c.rawText}`).join("\n\n")
-      : undefined;
+    pastPaperSources.length > 0 ? pastPaperSources.map((s) => s.text).join("\n\n") : undefined;
 
   if (!notesText && !pastPaperText) {
     return NextResponse.json({ error: "Selected content has no extractable text" }, { status: 400 });
@@ -74,11 +85,13 @@ export async function POST(request: Request, { params }: RouteParams) {
       status: "PENDING",
       provider: llm.name,
       model: llm.model,
-      sourceContent: { create: contentIds.map((contentId) => ({ contentId })) },
+      sourceContent: {
+        create: sources.map(({ content, range }) => ({ contentId: content.id, ...range })),
+      },
     },
   });
 
-  const allSourceText = contentItems.map((c) => `## ${c.title}\n${c.rawText}`).join("\n\n");
+  const allSourceText = sources.map((s) => s.text).join("\n\n");
 
   // Generation can take minutes (revision sets are written in parts), so it runs after the response:
   // the client gets the pending set straight away and watches its status.

@@ -133,6 +133,51 @@ describe("POST job contents", () => {
   });
 });
 
+describe("POST with a chapter range", () => {
+  const book = {
+    id: "c3",
+    unitId: "u1",
+    title: "Full notes",
+    contentKind: "NOTES",
+    rawText: "Chapter 1\nintro\nChapter 2\ncells\nChapter 3\ngenes",
+    outline: null, // older content: the outline is detected from the text
+  };
+
+  beforeEach(() => db.content.findMany.mockResolvedValue([book]));
+
+  it("sends only the chosen chapters to the LLM and stores the range on the set", async () => {
+    const res = await post({ ...valid, contentIds: ["c3"], ranges: { c3: { from: 0, to: 1 } } });
+    await runScheduled();
+
+    expect(res.status).toBe(202);
+    const text = "## Full notes (Chapter 1 → Chapter 2)\nChapter 1\nintro\nChapter 2\ncells";
+    expect(runGeneration.mock.calls[0][1]).toMatchObject({ notesText: text, allSourceText: text });
+    expect(db.questionSet.create.mock.calls[0][0].data.sourceContent).toEqual({
+      create: [{ contentId: "c3", rangeStart: 0, rangeEnd: 32, rangeLabel: "Chapter 1 → Chapter 2" }],
+    });
+  });
+
+  it("treats a range covering every chapter as the whole document", async () => {
+    await post({ ...valid, contentIds: ["c3"], ranges: { c3: { from: 0, to: 2 } } });
+    await runScheduled();
+
+    expect(runGeneration.mock.calls[0][1].notesText).toBe(`## Full notes\n${book.rawText}`);
+    expect(db.questionSet.create.mock.calls[0][0].data.sourceContent).toEqual({ create: [{ contentId: "c3" }] });
+  });
+
+  it("400s on a range past the last chapter and creates nothing", async () => {
+    const res = await post({ ...valid, contentIds: ["c3"], ranges: { c3: { from: 1, to: 5 } } });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('"Full notes" has only 3 sections');
+    expect(db.questionSet.create).not.toHaveBeenCalled();
+  });
+
+  it("400s on a backwards range", async () => {
+    const res = await post({ ...valid, contentIds: ["c3"], ranges: { c3: { from: 2, to: 1 } } });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("GET /units/:id/question-sets", () => {
   it("lists a unit's sets newest first", async () => {
     db.questionSet.findMany.mockResolvedValue([{ id: "s1" }]);
