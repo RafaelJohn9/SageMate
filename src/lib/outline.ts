@@ -31,6 +31,9 @@ const KEYWORD_HEADING = new RegExp(
   "i",
 );
 const MARKDOWN_HEADING = /^(#{1,3})\s+(.+?)\s*#*$/;
+// "1.18 Data types", "2.3.1 Paging". Needs a dot in the number (so "1. Point" list items never match) and
+// a capitalised title that does not end like a sentence (so "3.14 is pi." does not either).
+const NUMBERED_HEADING = /^(\d{1,2}(?:\.\d{1,3}){1,3})\.?\s+([A-Z(][^]*)$/;
 // Table-of-contents entries end in a page number, often after dot leaders: "Chapter 5 Networks ..... 45"
 const TOC_ENTRY = /(?:\.{2,}|…|\s)\s*\d{1,4}$/;
 
@@ -54,6 +57,17 @@ export function detectHeadings(rawText: string): OutlineSection[] {
     const md = MARKDOWN_HEADING.exec(trimmed);
     if (md) {
       sections.push({ title: md[2], level: md[1].length, start });
+      continue;
+    }
+
+    const numbered = NUMBERED_HEADING.exec(trimmed);
+    if (numbered) {
+      const [, number, rest] = numbered;
+      const key = `numbered ${number}`;
+      if (TOC_ENTRY.test(rest) || /[.,;:]$/.test(rest) || rest.split(" ").length > 12 || seen.has(key)) continue;
+      seen.add(key);
+      // 1.18 sits under chapter 1 (level 2); 1.18.2 under that.
+      sections.push({ title: `${number} ${rest.replace(/\s+/g, " ")}`, level: number.split(".").length, start });
       continue;
     }
 
@@ -106,6 +120,79 @@ export function sectionRange(
   const end = Math.min(next ? next.start : textLength, textLength);
   const label = from === to ? outline[from].title : `${outline[from].title} → ${last.title}`;
   return { start, end, label };
+}
+
+/** The last outline index the range from..to covers: `to` itself plus any subsections that follow it. */
+export function lastCoveredSection(outline: OutlineSection[], to: number): number {
+  let last = to;
+  while (last + 1 < outline.length && isWithin(outline, last + 1, to)) last++;
+  return last;
+}
+
+export type TextSpan = { start: number; end: number };
+export type SectionScope = { range: SectionRange; excluded: TextSpan[]; label: string };
+
+/**
+ * A section range with some sections left out, e.g. chapters 1-5 without 1.18. Leaving out a section
+ * also leaves out its subsections. `exclude` holds outline indices inside the range, which includes the
+ * subsections of `to` (see lastCoveredSection).
+ */
+export function sectionScope(
+  outline: OutlineSection[],
+  textLength: number,
+  from: number,
+  to: number,
+  exclude: number[] = [],
+): SectionScope {
+  const range = sectionRange(outline, textLength, from, to);
+  const leftOut = [...new Set(exclude)].sort((a, b) => a - b);
+  const last = lastCoveredSection(outline, to);
+  for (const i of leftOut) {
+    if (!Number.isInteger(i) || i < from || i > last) {
+      throw new RangeError(`Section ${i} is outside the chosen range ${from}–${to}`);
+    }
+  }
+
+  // Merge overlapping spans: leaving out 1.18 and its child 1.18.2 is one cut, not two.
+  const excluded: TextSpan[] = [];
+  for (const i of leftOut) {
+    // From the heading itself, so leaving out the first section keeps any preface before it.
+    const { end } = sectionRange(outline, textLength, i, i);
+    const span = { start: Math.max(outline[i].start, range.start), end: Math.min(end, range.end) };
+    const last = excluded.at(-1);
+    if (last && span.start <= last.end) last.end = Math.max(last.end, span.end);
+    else if (span.end > span.start) excluded.push(span);
+  }
+
+  // Name only the top-most sections left out; their subsections go without saying.
+  const named = leftOut.filter((i) => !leftOut.some((j) => j < i && isWithin(outline, i, j)));
+  const titles = named.map((i) => outline[i].title);
+  const label =
+    titles.length === 0
+      ? range.label
+      : `${range.label}, leaving out ${titles.length <= 3 ? titles.join(", ") : `${titles.length} sections`}`;
+  return { range, excluded, label };
+}
+
+/** True when section `child` is a subsection (at any depth) of section `parent`. */
+export function isWithin(outline: OutlineSection[], child: number, parent: number): boolean {
+  if (child <= parent) return false;
+  for (let i = parent + 1; i <= child; i++) {
+    if (outline[i].level <= outline[parent].level) return false;
+  }
+  return true;
+}
+
+/** The pieces of [start, end) that remain once the excluded spans are cut out. */
+export function keptSpans(start: number, end: number, excluded: TextSpan[]): TextSpan[] {
+  const kept: TextSpan[] = [];
+  let cursor = start;
+  for (const cut of [...excluded].sort((a, b) => a.start - b.start)) {
+    if (cut.start > cursor) kept.push({ start: cursor, end: Math.min(cut.start, end) });
+    cursor = Math.max(cursor, cut.end);
+  }
+  if (cursor < end) kept.push({ start: cursor, end });
+  return kept.filter((s) => s.end > s.start);
 }
 
 /** True when the range covers the whole document, i.e. there is nothing to scope. */

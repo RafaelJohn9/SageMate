@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { detectHeadings, isWholeDocument, resolveOutline, sectionRange } from "@/lib/outline";
+import {
+  detectHeadings,
+  isWholeDocument,
+  keptSpans,
+  lastCoveredSection,
+  resolveOutline,
+  sectionRange,
+  sectionScope,
+} from "@/lib/outline";
 
 const notes = [
   "Contents",
@@ -92,5 +100,91 @@ describe("resolveOutline", () => {
   it("falls back to detecting headings for older content without one", () => {
     expect(resolveOutline(null, notes)).toEqual(detectHeadings(notes));
     expect(resolveOutline("garbage", notes)).toEqual(detectHeadings(notes));
+  });
+});
+
+const numbered = [
+  "Chapter 1 Data",
+  "1.17 Arrays",
+  "Arrays hold items.",
+  "1.18 Pointers",
+  "Pointers hold addresses.",
+  "1.18.1 Pointer arithmetic",
+  "Add to a pointer.",
+  "1.19 Structs",
+  "Structs group fields.",
+  "Chapter 2 Control",
+  "Loops.",
+].join("\n");
+
+describe("numbered subtopic headings", () => {
+  it("finds 1.18-style headings, nested by how many parts the number has", () => {
+    expect(detectHeadings(numbered).map((s) => [s.title, s.level])).toEqual([
+      ["Chapter 1 Data", 1],
+      ["1.17 Arrays", 2],
+      ["1.18 Pointers", 2],
+      ["1.18.1 Pointer arithmetic", 3],
+      ["1.19 Structs", 2],
+      ["Chapter 2 Control", 1],
+    ]);
+  });
+
+  it("ignores numbered list points, decimals in sentences and contents entries", () => {
+    const text = [
+      "Chapter 1 Data",
+      "1. First point",
+      "3.14 is roughly pi.",
+      "2.1 Memory 12",
+      "1.5 Marks each, for a full answer.",
+      "Chapter 2 Control",
+    ].join("\n");
+    expect(detectHeadings(text).map((s) => s.title)).toEqual(["Chapter 1 Data", "Chapter 2 Control"]);
+  });
+});
+
+describe("sectionScope", () => {
+  const outline = detectHeadings(numbered);
+  const textOf = (from: number, to: number, exclude: number[]) => {
+    const { range, excluded } = sectionScope(outline, numbered.length, from, to, exclude);
+    return keptSpans(range.start, range.end, excluded)
+      .map((s) => numbered.slice(s.start, s.end))
+      .join("");
+  };
+
+  it("leaves out a subtopic and its own subsections", () => {
+    const text = textOf(0, 0, [2]);
+    expect(text).toContain("Arrays hold items.");
+    expect(text).toContain("Structs group fields.");
+    expect(text).not.toContain("Pointers");
+    expect(text).not.toContain("Add to a pointer.");
+    expect(text).not.toContain("Loops.");
+  });
+
+  it("names only the top-most sections left out", () => {
+    expect(sectionScope(outline, numbered.length, 0, 0, [2, 3]).label).toBe(
+      "Chapter 1 Data, leaving out 1.18 Pointers",
+    );
+    expect(sectionScope(outline, numbered.length, 0, 0, [2, 3]).excluded).toHaveLength(1);
+  });
+
+  it("counts the subsections of the last chapter as inside the range", () => {
+    expect(lastCoveredSection(outline, 0)).toBe(4);
+    expect(() => sectionScope(outline, numbered.length, 0, 0, [5])).toThrow(RangeError);
+  });
+});
+
+describe("keptSpans", () => {
+  it("cuts the excluded spans out of a range", () => {
+    expect(
+      keptSpans(0, 100, [
+        { start: 50, end: 60 },
+        { start: 10, end: 20 },
+      ]),
+    ).toEqual([
+      { start: 0, end: 10 },
+      { start: 20, end: 50 },
+      { start: 60, end: 100 },
+    ]);
+    expect(keptSpans(0, 10, [{ start: 0, end: 10 }])).toEqual([]);
   });
 });

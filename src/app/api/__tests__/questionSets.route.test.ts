@@ -172,6 +172,26 @@ describe("POST with a chapter range", () => {
     expect(db.questionSet.create).not.toHaveBeenCalled();
   });
 
+  it("leaves out the chosen sections and stores the cut", async () => {
+    // Sections: 0 Chapter 1, 1 Chapter 2, 2 Chapter 3. Keep 1-3 but drop Chapter 2.
+    await post({ ...valid, contentIds: ["c3"], ranges: { c3: { from: 0, to: 2, exclude: [1] } } });
+    await runScheduled();
+
+    expect(runGeneration.mock.calls[0][1].notesText).toBe(
+      "## Full notes (Chapter 1 → Chapter 3, leaving out Chapter 2)\nChapter 1\nintro\n\nChapter 3\ngenes",
+    );
+    expect(db.questionSet.create.mock.calls[0][0].data.sourceContent.create[0]).toMatchObject({
+      rangeStart: 0,
+      rangeEnd: book.rawText.length,
+      rangeExcluded: [{ start: 16, end: 32 }],
+    });
+  });
+
+  it("400s when every section is left out", async () => {
+    const res = await post({ ...valid, contentIds: ["c3"], ranges: { c3: { from: 1, to: 1, exclude: [1] } } });
+    expect(res.status).toBe(400);
+  });
+
   it("400s on a backwards range", async () => {
     const res = await post({ ...valid, contentIds: ["c3"], ranges: { c3: { from: 2, to: 1 } } });
     expect(res.status).toBe(400);

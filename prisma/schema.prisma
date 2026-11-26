@@ -85,6 +85,8 @@ model QuestionSetContent {
   rangeStart    Int?
   rangeEnd      Int?
   rangeLabel    String?
+  // Sections left out of that slice (e.g. 1.18), as [{ start, end }] offsets into rawText.
+  rangeExcluded Json?
 
   @@id([questionSetId, contentId])
 }

@@ -5,7 +5,14 @@ import { useMemo, useState, type FormEvent } from "react";
 import { buttonPrimary, ChipToggle, FormError, FormSection, inputClass } from "@/components/ui/form";
 import { formatCharCount } from "@/lib/formatting";
 import { revisionQuestionCount } from "@/lib/llm/revisionPlan";
-import { isWholeDocument, sectionRange, type OutlineSection } from "@/lib/outline";
+import {
+  isWholeDocument,
+  isWithin,
+  keptSpans,
+  lastCoveredSection,
+  sectionScope,
+  type OutlineSection,
+} from "@/lib/outline";
 
 type ContentOption = {
   id: string;
@@ -16,7 +23,8 @@ type ContentOption = {
   outline: OutlineSection[];
 };
 
-type Range = { from: number; to: number };
+// Section indices into the content's outline: from..to inclusive, minus the ones in `exclude`.
+type Range = { from: number; to: number; exclude: number[] };
 
 type Mode = "generate" | "extract" | "revision";
 
@@ -75,7 +83,7 @@ export function GenerateQuestionSetForm({
   function setRange(c: ContentOption, range: Range) {
     setRanges((prev) => {
       const next = { ...prev };
-      if (isWholeDocument(c.outline, range.from, range.to)) delete next[c.id];
+      if (isWholeDocument(c.outline, range.from, range.to) && range.exclude.length === 0) delete next[c.id];
       else next[c.id] = range;
       return next;
     });
@@ -84,8 +92,8 @@ export function GenerateQuestionSetForm({
   function scopedChars(c: ContentOption): number {
     const range = ranges[c.id];
     if (!range) return c.charCount;
-    const { start, end } = sectionRange(c.outline, c.charCount, range.from, range.to);
-    return end - start;
+    const { range: span, excluded } = sectionScope(c.outline, c.charCount, range.from, range.to, range.exclude);
+    return keptSpans(span.start, span.end, excluded).reduce((sum, s) => sum + s.end - s.start, 0);
   }
 
   const selectedChars = content
@@ -206,7 +214,7 @@ export function GenerateQuestionSetForm({
                   {checked && c.outline.length >= 2 && (
                     <SectionRangePicker
                       content={c}
-                      range={range ?? { from: 0, to: c.outline.length - 1 }}
+                      range={range ?? { from: 0, to: c.outline.length - 1, exclude: [] }}
                       scoped={range !== undefined}
                       onChange={(r) => setRange(c, r)}
                     />
@@ -307,7 +315,13 @@ function SectionRangePicker({
   const fromId = `range-from-${content.id}`;
   const toId = `range-to-${content.id}`;
   const selectClass = `${inputClass} py-1! sm:w-auto! sm:max-w-56`;
-  const { label } = sectionRange(content.outline, content.charCount, range.from, range.to);
+  const { label } = sectionScope(content.outline, content.charCount, range.from, range.to, range.exclude);
+  // Changing the range drops any left-out sections that are no longer inside it.
+  const withBounds = (from: number, to: number): Range => ({
+    from,
+    to,
+    exclude: range.exclude.filter((i) => i >= from && i <= lastCoveredSection(content.outline, to)),
+  });
 
   return (
     <div
@@ -325,7 +339,7 @@ function SectionRangePicker({
           // Moving the start past the end drags the end along, so the range stays valid.
           onChange={(e) => {
             const from = Number(e.target.value);
-            onChange({ from, to: Math.max(from, range.to) });
+            onChange(withBounds(from, Math.max(from, range.to)));
           }}
           className={selectClass}
         >
@@ -343,7 +357,7 @@ function SectionRangePicker({
           value={range.to}
           onChange={(e) => {
             const to = Number(e.target.value);
-            onChange({ from: Math.min(range.from, to), to });
+            onChange(withBounds(Math.min(range.from, to), to));
           }}
           className={selectClass}
         >
@@ -360,7 +374,7 @@ function SectionRangePicker({
             Covering {label}.{" "}
             <button
               type="button"
-              onClick={() => onChange({ from: 0, to: content.outline.length - 1 })}
+              onClick={() => onChange({ from: 0, to: content.outline.length - 1, exclude: [] })}
               className="text-foreground underline underline-offset-2 hover:no-underline"
             >
               Use the whole document
@@ -370,7 +384,73 @@ function SectionRangePicker({
           `Covering the whole document, ${content.outline.length} sections found.`
         )}
       </p>
+      {lastCoveredSection(content.outline, range.to) > range.from && (
+        <LeaveOutList
+          content={content}
+          range={range}
+          onChange={(exclude) => onChange({ ...range, exclude })}
+        />
+      )}
     </div>
+  );
+}
+
+/** Checkboxes for the sections inside the range, to drop subtopics that are not being examined. */
+function LeaveOutList({
+  content,
+  range,
+  onChange,
+}: {
+  content: ContentOption;
+  range: Range;
+  onChange: (exclude: number[]) => void;
+}) {
+  const last = lastCoveredSection(content.outline, range.to);
+  const indices = Array.from({ length: last - range.from + 1 }, (_, k) => range.from + k);
+  const count = range.exclude.length;
+  const [open, setOpen] = useState(count > 0);
+
+  return (
+    <details className="mt-2" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary className="w-fit cursor-pointer text-xs text-foreground underline underline-offset-2 marker:text-muted-foreground hover:no-underline">
+        {count === 0 ? "Leave out sections" : `Leaving out ${count} ${count === 1 ? "section" : "sections"}`}
+      </summary>
+      <ul className="mt-2 max-h-60 overflow-y-auto rounded-md border border-border bg-card py-1">
+        {indices.map((i) => {
+          const section = content.outline[i];
+          const parent = range.exclude.find((j) => isWithin(content.outline, i, j));
+          const leftOut = parent !== undefined || range.exclude.includes(i);
+          return (
+            <li key={i}>
+              <label
+                className={`flex items-start gap-2 py-1 pr-3 text-sm ${
+                  parent !== undefined ? "cursor-default opacity-60" : "cursor-pointer hover:bg-background/60"
+                }`}
+                style={{ paddingLeft: `${0.75 + (section.level - 1) * 1.1}rem` }}
+              >
+                <input
+                  type="checkbox"
+                  checked={leftOut}
+                  disabled={parent !== undefined}
+                  onChange={() =>
+                    onChange(
+                      range.exclude.includes(i)
+                        ? range.exclude.filter((j) => j !== i)
+                        : // Leaving out a section covers its subsections, so drop their own ticks.
+                          [...range.exclude.filter((j) => !isWithin(content.outline, j, i)), i],
+                    )
+                  }
+                  className="mt-0.5 size-3.5 shrink-0 accent-primary"
+                />
+                <span className={leftOut ? "text-muted-foreground line-through" : "text-foreground"}>
+                  {section.title}
+                </span>
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+    </details>
   );
 }
 
