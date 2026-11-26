@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getLLMProvider } from "@/lib/llm/factory";
 import { getQuestionSetSourceText } from "@/lib/questionSets";
+import { recordReview } from "@/lib/review";
+import { resultFromScore } from "@/lib/spacedRepetition";
 import { submitBatchAttemptsSchema } from "@/lib/validation/attempts";
 
 type RouteParams = { params: Promise<{ setId: string }> };
@@ -74,6 +76,11 @@ export async function POST(request: Request, { params }: RouteParams) {
         });
       }),
     );
+
+    // One at a time, in submission order: two answers to the same question must update its box in turn.
+    for (const [i, grading] of gradings.entries()) {
+      if (grading) await recordReview(attempts[i].questionId, resultFromScore(grading.score), attempts[i].submittedAt);
+    }
 
     const gradingByAttemptId = new Map(gradings.filter((g) => g !== null).map((g) => [g!.attemptId, g]));
     return NextResponse.json(

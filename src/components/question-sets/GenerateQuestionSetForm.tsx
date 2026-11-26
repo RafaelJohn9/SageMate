@@ -3,8 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 import { buttonPrimary, ChipToggle, FormError, FormSection, inputClass } from "@/components/ui/form";
+import { errorMessage } from "@/lib/apiError";
 import { formatCharCount } from "@/lib/formatting";
 import { revisionQuestionCount } from "@/lib/llm/revisionPlan";
+import {
+  isWholeDocument,
+  isWithin,
+  keptSpans,
+  lastCoveredSection,
+  sectionScope,
+  type OutlineSection,
+} from "@/lib/outline";
 
 type ContentOption = {
   id: string;
@@ -12,7 +21,11 @@ type ContentOption = {
   purpose: string;
   contentKind: "NOTES" | "PAST_PAPER";
   charCount: number;
+  outline: OutlineSection[];
 };
+
+// Section indices into the content's outline: from..to inclusive, minus the ones in `exclude`.
+type Range = { from: number; to: number; exclude: number[] };
 
 type Mode = "generate" | "extract" | "revision";
 
@@ -21,20 +34,6 @@ const FALLBACK_ERRORS: Record<Mode, string> = {
   extract: "Could not extract questions.",
   revision: "Could not create the revision set.",
 };
-
-// The API returns either a plain string or zod's flattened errors ({ formErrors, fieldErrors }).
-function errorMessage(error: unknown): string | null {
-  if (typeof error === "string") return error;
-  if (error && typeof error === "object") {
-    const { formErrors = [], fieldErrors = {} } = error as {
-      formErrors?: string[];
-      fieldErrors?: Record<string, string[] | undefined>;
-    };
-    const messages = [...formErrors, ...Object.values(fieldErrors).flatMap((m) => m ?? [])];
-    if (messages.length > 0) return messages.join(" ");
-  }
-  return null;
-}
 
 export function GenerateQuestionSetForm({
   unitId,
@@ -50,6 +49,8 @@ export function GenerateQuestionSetForm({
   const [selectedPurposes, setSelectedPurposes] = useState<string[]>([]);
   const [selectedContentIds, setSelectedContentIds] = useState<string[]>([]);
   const [count, setCount] = useState(10);
+  // Chapter ranges per content id; absent means the whole document.
+  const [ranges, setRanges] = useState<Record<string, Range>>({});
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<Mode | null>(null);
 
@@ -66,9 +67,25 @@ export function GenerateQuestionSetForm({
     setSelectedContentIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
+  function setRange(c: ContentOption, range: Range) {
+    setRanges((prev) => {
+      const next = { ...prev };
+      if (isWholeDocument(c.outline, range.from, range.to) && range.exclude.length === 0) delete next[c.id];
+      else next[c.id] = range;
+      return next;
+    });
+  }
+
+  function scopedChars(c: ContentOption): number {
+    const range = ranges[c.id];
+    if (!range) return c.charCount;
+    const { range: span, excluded } = sectionScope(c.outline, c.charCount, range.from, range.to, range.exclude);
+    return keptSpans(span.start, span.end, excluded).reduce((sum, s) => sum + s.end - s.start, 0);
+  }
+
   const selectedChars = content
     .filter((c) => selectedContentIds.includes(c.id))
-    .reduce((sum, c) => sum + c.charCount, 0);
+    .reduce((sum, c) => sum + scopedChars(c), 0);
   const revisionCount = revisionQuestionCount(selectedChars);
 
   const visibleContent =
@@ -103,6 +120,7 @@ export function GenerateQuestionSetForm({
         name,
         purposeFilter: selectedPurposes,
         contentIds: selectedContentIds,
+        ranges: Object.fromEntries(Object.entries(ranges).filter(([id]) => selectedContentIds.includes(id))),
         // Only "generate" uses the count; extract and revision decide it from the content.
         ...(mode === "generate" ? { count } : {}),
         mode,
@@ -150,30 +168,47 @@ export function GenerateQuestionSetForm({
         )}
       </FormSection>
 
-      <FormSection title="Sources" hint="Tick the notes and past papers to draw from.">
+      <FormSection
+        title="Sources"
+        hint="Tick the notes and past papers to draw from. For long notes, pick the chapters to cover."
+      >
         {visibleContent.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nothing matches the purposes you chose.</p>
         ) : (
           <ul className="border-t border-border">
-            {visibleContent.map((c) => (
-              <li key={c.id} className="border-b border-border">
-                <label className="flex cursor-pointer items-start gap-3 py-2.5 transition-colors hover:bg-card/70">
-                  <input
-                    type="checkbox"
-                    checked={selectedContentIds.includes(c.id)}
-                    onChange={() => toggleContent(c.id)}
-                    className="mt-1 size-4 shrink-0 accent-primary"
-                  />
-                  <span className="min-w-0 text-sm">
-                    <span className="block font-medium text-foreground">{c.title}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {c.contentKind === "PAST_PAPER" ? "Past paper" : "Notes"} · {c.purpose} ·{" "}
-                      {formatCharCount(c.charCount)}
+            {visibleContent.map((c) => {
+              const checked = selectedContentIds.includes(c.id);
+              const range = ranges[c.id];
+              return (
+                <li key={c.id} className="border-b border-border">
+                  <label className="flex cursor-pointer items-start gap-3 py-2.5 transition-colors hover:bg-card/70">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleContent(c.id)}
+                      className="mt-1 size-4 shrink-0 accent-primary"
+                    />
+                    <span className="min-w-0 text-sm">
+                      <span className="block font-medium text-foreground">{c.title}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {c.contentKind === "PAST_PAPER" ? "Past paper" : "Notes"} · {c.purpose} ·{" "}
+                        {range
+                          ? `${formatCharCount(scopedChars(c))} of ${formatCharCount(c.charCount)}`
+                          : formatCharCount(c.charCount)}
+                      </span>
                     </span>
-                  </span>
-                </label>
-              </li>
-            ))}
+                  </label>
+                  {checked && c.outline.length >= 2 && (
+                    <SectionRangePicker
+                      content={c}
+                      range={range ?? { from: 0, to: c.outline.length - 1, exclude: [] }}
+                      scoped={range !== undefined}
+                      onChange={(r) => setRange(c, r)}
+                    />
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
         {selectedContentIds.length > 0 && (
@@ -245,6 +280,164 @@ export function GenerateQuestionSetForm({
         </ul>
       </FormSection>
     </form>
+  );
+}
+
+function sectionOptionLabel(section: OutlineSection): string {
+  // Native <option>s ignore padding, so subsections are indented with non-breaking spaces.
+  return `${"\u00a0\u00a0\u00a0".repeat(section.level - 1)}${section.title}`;
+}
+
+function SectionRangePicker({
+  content,
+  range,
+  scoped,
+  onChange,
+}: {
+  content: ContentOption;
+  range: Range;
+  scoped: boolean;
+  onChange: (range: Range) => void;
+}) {
+  const fromId = `range-from-${content.id}`;
+  const toId = `range-to-${content.id}`;
+  const selectClass = `${inputClass} py-1! sm:w-auto! sm:max-w-56`;
+  const { label } = sectionScope(content.outline, content.charCount, range.from, range.to, range.exclude);
+  // Changing the range drops any left-out sections that are no longer inside it.
+  const withBounds = (from: number, to: number): Range => ({
+    from,
+    to,
+    exclude: range.exclude.filter((i) => i >= from && i <= lastCoveredSection(content.outline, to)),
+  });
+
+  return (
+    <div
+      role="group"
+      aria-label={`Chapters to cover from ${content.title}`}
+      className="mb-3 ml-[0.4rem] border-l-2 border-border pl-[1.1rem]"
+    >
+      <div className="flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:items-center">
+        <label htmlFor={fromId} className="text-muted-foreground">
+          From
+        </label>
+        <select
+          id={fromId}
+          value={range.from}
+          // Moving the start past the end drags the end along, so the range stays valid.
+          onChange={(e) => {
+            const from = Number(e.target.value);
+            onChange(withBounds(from, Math.max(from, range.to)));
+          }}
+          className={selectClass}
+        >
+          {content.outline.map((section, i) => (
+            <option key={i} value={i}>
+              {sectionOptionLabel(section)}
+            </option>
+          ))}
+        </select>
+        <label htmlFor={toId} className="text-muted-foreground">
+          through
+        </label>
+        <select
+          id={toId}
+          value={range.to}
+          onChange={(e) => {
+            const to = Number(e.target.value);
+            onChange(withBounds(Math.min(range.from, to), to));
+          }}
+          className={selectClass}
+        >
+          {content.outline.map((section, i) => (
+            <option key={i} value={i}>
+              {sectionOptionLabel(section)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="mt-1.5 text-xs text-muted-foreground" aria-live="polite">
+        {scoped ? (
+          <>
+            Covering {label}.{" "}
+            <button
+              type="button"
+              onClick={() => onChange({ from: 0, to: content.outline.length - 1, exclude: [] })}
+              className="text-foreground underline underline-offset-2 hover:no-underline"
+            >
+              Use the whole document
+            </button>
+          </>
+        ) : (
+          `Covering the whole document, ${content.outline.length} sections found.`
+        )}
+      </p>
+      {lastCoveredSection(content.outline, range.to) > range.from && (
+        <LeaveOutList
+          content={content}
+          range={range}
+          onChange={(exclude) => onChange({ ...range, exclude })}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Checkboxes for the sections inside the range, to drop subtopics that are not being examined. */
+function LeaveOutList({
+  content,
+  range,
+  onChange,
+}: {
+  content: ContentOption;
+  range: Range;
+  onChange: (exclude: number[]) => void;
+}) {
+  const last = lastCoveredSection(content.outline, range.to);
+  const indices = Array.from({ length: last - range.from + 1 }, (_, k) => range.from + k);
+  const count = range.exclude.length;
+  const [open, setOpen] = useState(count > 0);
+
+  return (
+    <details className="mt-2" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary className="w-fit cursor-pointer text-xs text-foreground underline underline-offset-2 marker:text-muted-foreground hover:no-underline">
+        {count === 0 ? "Leave out sections" : `Leaving out ${count} ${count === 1 ? "section" : "sections"}`}
+      </summary>
+      <ul className="mt-2 max-h-60 overflow-y-auto rounded-md border border-border bg-card py-1">
+        {indices.map((i) => {
+          const section = content.outline[i];
+          const parent = range.exclude.find((j) => isWithin(content.outline, i, j));
+          const leftOut = parent !== undefined || range.exclude.includes(i);
+          return (
+            <li key={i}>
+              <label
+                className={`flex items-start gap-2 py-1 pr-3 text-sm ${
+                  parent !== undefined ? "cursor-default opacity-60" : "cursor-pointer hover:bg-background/60"
+                }`}
+                style={{ paddingLeft: `${0.75 + (section.level - 1) * 1.1}rem` }}
+              >
+                <input
+                  type="checkbox"
+                  checked={leftOut}
+                  disabled={parent !== undefined}
+                  onChange={() =>
+                    onChange(
+                      range.exclude.includes(i)
+                        ? range.exclude.filter((j) => j !== i)
+                        : // Leaving out a section covers its subsections, so drop their own ticks.
+                          [...range.exclude.filter((j) => !isWithin(content.outline, j, i)), i],
+                    )
+                  }
+                  className="mt-0.5 size-3.5 shrink-0 accent-primary"
+                />
+                <span className={leftOut ? "text-muted-foreground line-through" : "text-foreground"}>
+                  {section.title}
+                </span>
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+    </details>
   );
 }
 

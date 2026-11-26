@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getLLMProvider } from "@/lib/llm/factory";
-import { getQuestionSetSourceText } from "@/lib/questionSets";
+import { getQuestionSourceText } from "@/lib/questionSets";
 import { discussionMessageSchema } from "@/lib/validation/attempts";
 
 type RouteParams = { params: Promise<{ gradingId: string }> };
@@ -50,7 +50,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   let reply: string;
   try {
     const llm = getLLMProvider();
-    const sourceText = await getQuestionSetSourceText(question.questionSetId);
+    const sourceText = await getQuestionSourceText(question);
     reply = await llm.discussAnswer({
       questionText: question.text,
       sourceText,

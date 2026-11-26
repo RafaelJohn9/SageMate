@@ -5,7 +5,8 @@ import { SidebarNav } from "./SidebarNav";
 export async function Sidebar() {
   const units = await db.unit.findMany({
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, _count: { select: { content: true, questionSets: true } } },
+    select: { id: true, name: true, // The hidden morning-repetition bank is not one of the student's own sets.
+      _count: { select: { content: true, questionSets: { where: { kind: { not: "REVIEW" } } } } } },
   });
 
   return (

@@ -10,6 +10,10 @@ const llm = vi.hoisted(() => ({ name: "fake", model: "fake-1", gradeAnswerBatch:
 vi.mock("@/lib/db", () => ({ db }));
 vi.mock("@/lib/llm/factory", () => ({ getLLMProvider: () => llm }));
 vi.mock("@/lib/questionSets", () => ({ getQuestionSetSourceText: async () => "source" }));
+const recordReview = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/review", () => ({ recordReview }));
+
+const submittedAt = new Date("2026-11-06T10:00:00Z");
 
 import { POST } from "../question-sets/[setId]/attempts/batch/route";
 
@@ -25,7 +29,7 @@ const questions = [
 beforeEach(() => {
   vi.resetAllMocks();
   db.questionSet.findUnique.mockResolvedValue({ id: "s1", questions });
-  db.attempt.create.mockImplementation(async ({ data }) => ({ id: `a-${data.questionId}`, ...data }));
+  db.attempt.create.mockImplementation(async ({ data }) => ({ id: `a-${data.questionId}`, submittedAt, ...data }));
   db.grading.create.mockImplementation(async ({ data }) => ({ id: `g-${data.attemptId}`, ...data }));
 });
 
@@ -81,6 +85,10 @@ describe("POST grading", () => {
     expect(body.attempts.map((a: { grading: { score: number } }) => a.grading.score)).toEqual([75, 40]);
     expect(body.attempts[0].grading).toMatchObject({ marksAwarded: 3, provider: "fake", model: "fake-1" });
     expect(body.attempts[1].grading.marksAwarded).toBeNull();
+    expect(recordReview.mock.calls).toEqual([
+      ["q1", "PASS", submittedAt],
+      ["q2", "FAIL", submittedAt],
+    ]);
   });
 
   it("returns a null grading for an attempt the LLM skipped", async () => {
@@ -91,6 +99,7 @@ describe("POST grading", () => {
     expect(body.attempts[0].grading).not.toBeNull();
     expect(body.attempts[1].grading).toBeNull();
     expect(db.grading.create).toHaveBeenCalledTimes(1);
+    expect(recordReview.mock.calls).toEqual([["q1", "PASS", submittedAt]]);
   });
 
   it("keeps the attempts and reports gradingError when grading fails", async () => {
@@ -104,5 +113,6 @@ describe("POST grading", () => {
     expect(body.attempts).toHaveLength(2);
     expect(body.attempts.every((a: { grading: unknown }) => a.grading === null)).toBe(true);
     expect(db.grading.create).not.toHaveBeenCalled();
+    expect(recordReview).not.toHaveBeenCalled();
   });
 });

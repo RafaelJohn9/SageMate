@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { extractPdfText } from "@/lib/parsing/pdf";
+import { extractPdf } from "@/lib/parsing/pdf";
 import { extractDocxText } from "@/lib/parsing/docx";
+import { detectHeadings, type OutlineSection } from "@/lib/outline";
 import { contentKindSchema, createPasteContentSchema, purposeSchema } from "@/lib/validation/content";
 
 type RouteParams = { params: Promise<{ unitId: string }> };
@@ -68,8 +69,14 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     const buffer = await file.arrayBuffer();
     let rawText: string;
+    let outline: OutlineSection[];
     try {
-      rawText = isPdf ? await extractPdfText(buffer) : await extractDocxText(buffer);
+      if (isPdf) {
+        ({ text: rawText, outline } = await extractPdf(buffer));
+      } else {
+        rawText = await extractDocxText(buffer);
+        outline = detectHeadings(rawText);
+      }
     } catch (err) {
       return NextResponse.json(
         { error: `Could not read "${file.name}": ${err instanceof Error ? err.message : String(err)}` },
@@ -89,6 +96,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         contentKind: contentKindResult.data,
         purpose: purposeResult.data,
         rawText,
+        outline,
         originalFilename: file.name,
       },
     });
@@ -109,6 +117,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       contentKind: parsed.data.contentKind,
       purpose: parsed.data.purpose,
       rawText: parsed.data.text,
+      outline: detectHeadings(parsed.data.text),
     },
   });
   return NextResponse.json({ content }, { status: 201 });

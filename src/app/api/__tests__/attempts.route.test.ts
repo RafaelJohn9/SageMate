@@ -9,7 +9,11 @@ const llm = vi.hoisted(() => ({ name: "fake", model: "fake-1", gradeAnswer: vi.f
 
 vi.mock("@/lib/db", () => ({ db }));
 vi.mock("@/lib/llm/factory", () => ({ getLLMProvider: () => llm }));
-vi.mock("@/lib/questionSets", () => ({ getQuestionSetSourceText: async () => "source" }));
+vi.mock("@/lib/questionSets", () => ({ getQuestionSourceText: async () => "source" }));
+const recordReview = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/review", () => ({ recordReview }));
+
+const submittedAt = new Date("2026-11-06T10:00:00Z");
 
 import { GET, POST } from "../questions/[questionId]/attempts/route";
 
@@ -35,7 +39,7 @@ describe("POST /questions/:id/attempts", () => {
 
   it("stores the attempt and grading on success", async () => {
     db.question.findUnique.mockResolvedValue({ id: "q1", text: "T", questionSetId: "s1", marks: 4, markingScheme: "ms" });
-    db.attempt.create.mockResolvedValue({ id: "a1" });
+    db.attempt.create.mockImplementation(async ({ data }) => ({ id: "a1", submittedAt, ...data }));
     llm.gradeAnswer.mockResolvedValue({ score: 75, marksAwarded: 3, feedback: "good" });
     db.grading.create.mockImplementation(async ({ data }) => ({ id: "g1", ...data }));
 
@@ -47,11 +51,23 @@ describe("POST /questions/:id/attempts", () => {
       expect.objectContaining({ questionText: "T", answerText: "my answer", marks: 4, markingScheme: "ms" }),
     );
     expect(body.attempt.grading).toMatchObject({ score: 75, provider: "fake", model: "fake-1" });
+    expect(recordReview).toHaveBeenCalledWith("q1", "PASS", submittedAt);
+  });
+
+  it("schedules a fail for a score under the pass mark", async () => {
+    db.question.findUnique.mockResolvedValue({ id: "q1", text: "T", questionSetId: "s1" });
+    db.attempt.create.mockResolvedValue({ id: "a1", submittedAt });
+    llm.gradeAnswer.mockResolvedValue({ score: 69, feedback: "close" });
+    db.grading.create.mockImplementation(async ({ data }) => ({ id: "g1", ...data }));
+
+    await post({ answerText: "x" });
+
+    expect(recordReview).toHaveBeenCalledWith("q1", "FAIL", submittedAt);
   });
 
   it("keeps the attempt and reports gradingError when the LLM fails", async () => {
     db.question.findUnique.mockResolvedValue({ id: "q1", text: "T", questionSetId: "s1" });
-    db.attempt.create.mockResolvedValue({ id: "a1" });
+    db.attempt.create.mockResolvedValue({ id: "a1", submittedAt });
     llm.gradeAnswer.mockRejectedValue(new Error("rate limited"));
 
     const res = await post({ answerText: "x" });
@@ -61,6 +77,7 @@ describe("POST /questions/:id/attempts", () => {
     expect(body.attempt.id).toBe("a1");
     expect(body.gradingError).toContain("rate limited");
     expect(db.grading.create).not.toHaveBeenCalled();
+    expect(recordReview).not.toHaveBeenCalled();
   });
 });
 

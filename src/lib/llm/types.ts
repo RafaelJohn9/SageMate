@@ -5,6 +5,14 @@ export interface GenerateQuestionsInput {
   pastPaperText?: string;
   priorQuestions?: string[];
   count: number;
+  /** How many of the questions should be APPLICATION. Defaults to 2 when count is over 2, else 0. */
+  applicationCount?: number;
+}
+
+export interface BriefSectionInput {
+  unitTitle: string;
+  sectionTitle: string;
+  sourceText: string;
 }
 
 export interface ExtractQuestionsInput {
@@ -78,4 +86,6 @@ export interface LLMProvider {
   gradeAnswer(input: GradeAnswerInput): Promise<GradingResult>;
   gradeAnswerBatch(items: GradeAnswerBatchItem[]): Promise<GradeAnswerBatchResult[]>;
   discussAnswer(input: DiscussAnswerInput): Promise<string>;
+  /** A short Markdown primer for a section the student is about to read. */
+  briefSection(input: BriefSectionInput): Promise<string>;
 }

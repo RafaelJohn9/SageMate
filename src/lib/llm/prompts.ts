@@ -1,4 +1,5 @@
 import type {
+  BriefSectionInput,
   DiscussAnswerInput,
   ExtractQuestionsInput,
   GenerateQuestionsInput,
@@ -35,7 +36,7 @@ export function buildGenerateQuestionsPrompt(input: GenerateQuestionsInput): {
   system: string;
   user: string;
 } {
-  const applicationCount = input.count > 2 ? 2 : 0;
+  const applicationCount = Math.min(input.count, Math.max(0, input.applicationCount ?? (input.count > 2 ? 2 : 0)));
   const conceptualCount = input.count - applicationCount;
 
   const system = [
@@ -335,4 +336,32 @@ MODEL ANSWER:
 ${grading.modelAnswer}
 ` : ""}
 `.trim();
+}
+
+export function buildBriefSectionPrompt(input: BriefSectionInput): { system: string; user: string } {
+  const system = [
+    "You are a tutor preparing a student to read one section of their own course notes.",
+    "A good primer makes the reading faster and stickier: the student knows what matters before they start.",
+    "Write only from the section given. Format with Markdown. No HTML, no preamble, no closing remarks.",
+  ].join(" ");
+
+  const user = `
+UNIT: ${input.unitTitle}
+SECTION: ${input.sectionTitle}
+
+SECTION TEXT:
+${truncate(input.sourceText, MAX_SOURCE_CHARS)}
+
+Write a primer of at most 180 words with exactly these three parts, each introduced by its bold label:
+
+**The gist** - two or three sentences on what this section is about and why it matters in the unit.
+
+**Look out for** - three to five bullets naming the key terms, distinctions or steps to notice while
+reading, each with a few words on what it is.
+
+**Check yourself after** - three short questions the student should be able to answer from memory once
+they have read the section. Questions only, no answers.
+`.trim();
+
+  return { system, user };
 }
