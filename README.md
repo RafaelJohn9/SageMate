@@ -56,6 +56,24 @@ generate open-ended revision questions, answer and grade them with an LLM, and e
 5. **Export** a question set to PDF: questions only, questions + your answers, or questions +
    answers + corrections.
 
+## Morning repetition
+
+A daily spaced-repetition session, at `/morning`.
+
+- **Plan** (`/morning/plan`): add units, and for each choose a start and end date, the documents to
+  read, and how far into each you want to get. Set how many questions you want each morning
+  (default 5) and the fewest units they should be drawn from (default 3).
+- **Reading**: each document is cut into parts along its chapters. What is unread is shared out
+  evenly over the days left, so the daily share adjusts if you fall behind or read ahead. Tick parts
+  off as you read them; "Prime me first" writes a short primer on what to look out for.
+- **Questions**: each morning's session mixes questions that are due for review, new questions on
+  what you read most recently (written on demand, from the parts you have ticked), and, if there is
+  room, questions that are not due yet. Graded questions from your ordinary question sets on the same
+  documents come round too.
+- **Schedule**: Leitner boxes (`src/lib/spacedRepetition.ts`). A pass (70%+) moves a question up a
+  box, due again in 1, 3, 7, 14, then 30 days; a fail sends it back to tomorrow. Nothing is scheduled
+  past a unit's end date, so everything comes round once more before it.
+
 ## Notes
 
 - Database: `dev.db` in the project root (gitignored). Inspect it with `npx prisma studio`.

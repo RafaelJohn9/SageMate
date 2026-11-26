@@ -11,7 +11,7 @@ export default async function Home() {
     db.unit.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        _count: { select: { content: true, questionSets: true } },
+        _count: { select: { content: true, questionSets: { where: { kind: { not: "REVIEW" } } } } },
         questionSets: {
           where: { kind: "PRACTICE" },
           select: {

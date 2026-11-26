@@ -18,9 +18,16 @@ export function SidebarNav({ units }: { units: UnitSummary[] }) {
 
   return (
     <nav
-      aria-label="Units"
+      aria-label="Main"
       className="flex gap-1 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0"
     >
+      <Link
+        href="/morning"
+        aria-current={pathname.startsWith("/morning") ? "page" : undefined}
+        className={`${itemBase} font-medium ${pathname.startsWith("/morning") ? active : idle}`}
+      >
+        Morning repetition
+      </Link>
       <Link
         href="/"
         aria-current={pathname === "/" ? "page" : undefined}

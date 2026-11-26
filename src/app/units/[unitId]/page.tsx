@@ -19,6 +19,8 @@ export default async function UnitDetailPage({
     include: {
       content: { orderBy: { createdAt: "desc" } },
       questionSets: {
+        // The morning-repetition bank is worked through from the Morning page, not as a set.
+        where: { kind: { not: "REVIEW" } },
         orderBy: { createdAt: "desc" },
         include: {
           questions: {

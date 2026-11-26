@@ -29,6 +29,12 @@ describe("buildGenerateQuestionsPrompt", () => {
     expect(user).toContain("1. Old one?");
     expect(user).toContain("2. Old two?");
   });
+  it("ends with two application questions by default, or as many as asked for", () => {
+    expect(buildGenerateQuestionsPrompt(base).user).toContain("final 2 questions must be APPLICATION");
+    const { user } = buildGenerateQuestionsPrompt({ ...base, count: 3, applicationCount: 1 });
+    expect(user).toContain("first 2 questions must be CONCEPTUAL");
+    expect(user).toContain("final 1 questions must be APPLICATION");
+  });
   it("truncates very long source text", () => {
     const { user } = buildGenerateQuestionsPrompt({ ...base, notesText: "z".repeat(500_000) });
     expect(user.length).toBeLessThan(200_000);

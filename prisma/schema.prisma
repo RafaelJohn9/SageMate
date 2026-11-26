@@ -20,6 +20,7 @@ model Unit {
   updatedAt    DateTime      @updatedAt
   content      Content[]
   questionSets QuestionSet[]
+  studyTrack   StudyTrack?
 }
 
 enum SourceType {
@@ -47,11 +48,15 @@ model Content {
   outline          Json?
   createdAt        DateTime             @default(now())
   questionSets     QuestionSetContent[]
+  studySources     StudyTrackContent[]
+  studySteps       StudyStep[]
 }
 
 enum QuestionSetKind {
   PRACTICE
   REVISION
+  // The hidden per-unit bank that morning-repetition questions are written into.
+  REVIEW
 }
 
 enum QuestionSetStatus {
@@ -74,6 +79,7 @@ model QuestionSet {
   createdAt     DateTime             @default(now())
   sourceContent QuestionSetContent[]
   questions     Question[]
+  studyTrack    StudyTrack?
 }
 
 model QuestionSetContent {
@@ -108,6 +114,24 @@ model Question {
   answer        String?
   createdAt     DateTime     @default(now())
   attempts      Attempt[]
+
+  // Spaced-repetition schedule (Leitner boxes); see src/lib/spacedRepetition.ts.
+  box            Int           @default(1)
+  dueAt          DateTime?
+  lastReviewedAt DateTime?
+  lastResult     ReviewResult?
+
+  // Set for morning-repetition questions: the part of the study plan the question was written from.
+  stepId       String?
+  step         StudyStep?          @relation(fields: [stepId], references: [id], onDelete: SetNull)
+  sessionItems ReviewSessionItem[]
+
+  @@index([dueAt])
+}
+
+enum ReviewResult {
+  PASS
+  FAIL
 }
 
 enum AttemptMode {
@@ -123,6 +147,7 @@ model Attempt {
   mode        AttemptMode
   submittedAt DateTime    @default(now())
   grading     Grading?
+  sessionItem ReviewSessionItem?
 }
 
 model Grading {
@@ -153,4 +178,94 @@ model DiscussionMessage {
   createdAt DateTime       @default(now())
 
   @@index([gradingId, createdAt])
+}
+
+// ---- Morning repetition ----
+// Days are stored as "YYYY-MM-DD" strings in the server's local time zone: a study day is a calendar
+// day, not an instant. See src/lib/studyPlan.ts.
+
+/// Single row (id "default"): how each morning's session is put together.
+model ReviewSettings {
+  id             String @id @default("default")
+  dailyQuestions Int    @default(5)
+  minUnits       Int    @default(3)
+}
+
+/// One unit in the study plan: which material to get through, and between which dates.
+model StudyTrack {
+  id        String              @id @default(cuid())
+  unitId    String              @unique
+  unit      Unit                @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  startDate String
+  endDate   String
+  paused    Boolean             @default(false)
+  // Questions written for this track live in a hidden REVIEW question set.
+  bankSetId String              @unique
+  bankSet   QuestionSet         @relation(fields: [bankSetId], references: [id], onDelete: Cascade)
+  createdAt DateTime            @default(now())
+  sources   StudyTrackContent[]
+  steps     StudyStep[]
+}
+
+/// A document in a track and how far into it the student wants to get (outline indices, inclusive).
+model StudyTrackContent {
+  trackId     String
+  contentId   String
+  track       StudyTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  content     Content    @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  orderIndex  Int        @default(0)
+  // Null when the document has no chapters to choose from (the whole text is covered).
+  fromSection Int?
+  toSection   Int?
+
+  @@id([trackId, contentId])
+}
+
+/// A readable piece of a track's material (a section, or part of a long one), in reading order.
+model StudyStep {
+  id         String     @id @default(cuid())
+  trackId    String
+  track      StudyTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  contentId  String
+  content    Content    @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  orderIndex Int
+  title      String
+  // Offsets into the content's rawText.
+  start      Int
+  end        Int
+  // The day the student marked it as read; questions are only asked about read steps.
+  readOn     String?
+  // A short "what to look for" primer, written on request.
+  briefing   String?
+  questions  Question[]
+
+  @@index([trackId, orderIndex])
+}
+
+/// The questions picked for one morning.
+model ReviewSession {
+  id        String              @id @default(cuid())
+  day       String              @unique
+  status    QuestionSetStatus   @default(PENDING)
+  error     String?
+  // When the current preparation run began (a session can be topped up later in the day).
+  startedAt DateTime            @default(now())
+  createdAt DateTime            @default(now())
+  items     ReviewSessionItem[]
+}
+
+model ReviewSessionItem {
+  id         String        @id @default(cuid())
+  sessionId  String
+  session    ReviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  orderIndex Int
+  // Why it was picked: "due" (scheduled for today or overdue), "new" (first time), "early" (not due yet).
+  reason     String
+  // The graded answer that completed this item.
+  attemptId  String?       @unique
+  attempt    Attempt?      @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, questionId])
 }

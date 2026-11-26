@@ -1,6 +1,7 @@
 import Groq from "groq-sdk";
 import { z } from "zod";
 import {
+  buildBriefSectionPrompt,
   buildDiscussAnswerSystemPrompt,
   buildExtractQuestionsPrompt,
   buildGenerateQuestionsPrompt,
@@ -10,6 +11,7 @@ import {
 } from "../prompts";
 import { planRevisionChunks } from "../revisionPlan";
 import type {
+  BriefSectionInput,
   DiscussAnswerInput,
   ExtractQuestionsInput,
   GenerateQuestionsInput,
@@ -123,6 +125,32 @@ export class GroqProvider implements LLMProvider {
       }
     }
     throw new Error(`Groq discussion request failed: ${String(lastError)}`);
+  }
+
+  async briefSection(input: BriefSectionInput): Promise<string> {
+    const { system, user } = buildBriefSectionPrompt(input);
+    const ATTEMPTS = 3;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+      try {
+        const completion = await this.client.chat.completions.create({
+          model: this.model,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+          temperature: 0.3,
+          max_completion_tokens: 2048,
+          ...(this.supportsReasoningEffort ? { reasoning_effort: "low" as const } : {}),
+        });
+        const reply = completion.choices[0]?.message?.content?.trim() ?? "";
+        if (reply) return reply;
+        lastError = new Error("Empty reply");
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw new Error(`Groq briefing request failed: ${String(lastError)}`);
   }
 
   async generateQuestions(input: GenerateQuestionsInput): Promise<GeneratedQuestion[]> {

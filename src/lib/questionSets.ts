@@ -68,3 +68,19 @@ export async function getQuestionSetSourceText(questionSetId: string): Promise<s
   });
   return sourceContent.map((sc) => formatSource(sc.content, sc)).join("\n\n");
 }
+
+/**
+ * The source a single question should be graded and discussed against. Morning-repetition questions
+ * are written from one step of a study plan, so that step is their source; everything else uses the
+ * sources of its question set.
+ */
+export async function getQuestionSourceText(question: { questionSetId: string; stepId?: string | null }): Promise<string> {
+  if (question.stepId) {
+    const step = await db.studyStep.findUnique({
+      where: { id: question.stepId },
+      include: { content: { select: { title: true, rawText: true } } },
+    });
+    if (step) return `## ${step.content.title} (${step.title})\n${step.content.rawText.slice(step.start, step.end).trim()}`;
+  }
+  return getQuestionSetSourceText(question.questionSetId);
+}

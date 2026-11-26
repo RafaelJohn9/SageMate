@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 import { buttonPrimary, ChipToggle, FormError, FormSection, inputClass } from "@/components/ui/form";
+import { errorMessage } from "@/lib/apiError";
 import { formatCharCount } from "@/lib/formatting";
 import { revisionQuestionCount } from "@/lib/llm/revisionPlan";
 import {
@@ -33,20 +34,6 @@ const FALLBACK_ERRORS: Record<Mode, string> = {
   extract: "Could not extract questions.",
   revision: "Could not create the revision set.",
 };
-
-// The API returns either a plain string or zod's flattened errors ({ formErrors, fieldErrors }).
-function errorMessage(error: unknown): string | null {
-  if (typeof error === "string") return error;
-  if (error && typeof error === "object") {
-    const { formErrors = [], fieldErrors = {} } = error as {
-      formErrors?: string[];
-      fieldErrors?: Record<string, string[] | undefined>;
-    };
-    const messages = [...formErrors, ...Object.values(fieldErrors).flatMap((m) => m ?? [])];
-    if (messages.length > 0) return messages.join(" ");
-  }
-  return null;
-}
 
 export function GenerateQuestionSetForm({
   unitId,

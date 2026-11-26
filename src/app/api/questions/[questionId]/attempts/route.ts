@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getLLMProvider } from "@/lib/llm/factory";
-import { getQuestionSetSourceText } from "@/lib/questionSets";
+import { gradeAttempt } from "@/lib/grading";
 import { submitAttemptSchema } from "@/lib/validation/attempts";
 
 type RouteParams = { params: Promise<{ questionId: string }> };
@@ -35,26 +34,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   });
 
   try {
-    const llm = getLLMProvider();
-    const sourceText = await getQuestionSetSourceText(question.questionSetId);
-    const result = await llm.gradeAnswer({
-      questionText: question.text,
-      sourceText,
-      answerText: parsed.data.answerText,
-      marks: question.marks ?? undefined,
-      markingScheme: question.markingScheme ?? undefined,
-    });
-    const grading = await db.grading.create({
-      data: {
-        attemptId: attempt.id,
-        score: result.score,
-        marksAwarded: result.marksAwarded ?? null,
-        feedback: result.feedback,
-        modelAnswer: result.modelAnswer,
-        provider: llm.name,
-        model: llm.model,
-      },
-    });
+    const grading = await gradeAttempt(question, attempt);
     return NextResponse.json({ attempt: { ...attempt, grading } }, { status: 201 });
   } catch (err) {
     return NextResponse.json(
